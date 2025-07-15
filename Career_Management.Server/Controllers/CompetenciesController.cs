@@ -1,0 +1,167 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Career_Management.Server.Data;
+using Career_Management.Server.Models;
+using Career_Management.Server.Models.DTOs;
+
+namespace Career_Management.Server.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class CompetenciesController : ControllerBase
+    {
+        private readonly CareerManagementContext _context;
+
+        public CompetenciesController(CareerManagementContext context)
+        {
+            _context = context;
+        }
+
+        // GET: api/Competencies
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<CompetencyDto>>> GetCompetencies()
+        {
+            var competencies = await _context.Competencies
+                .Include(c => c.Category)
+                .ThenInclude(cat => cat!.Domain)
+                .Where(c => c.IsActive)
+                .OrderBy(c => c.DisplayOrder)
+                .ThenBy(c => c.CompetencyName)
+                .Select(c => new CompetencyDto
+                {
+                    CompetencyID = c.CompetencyID,
+                    CategoryID = c.CategoryID,
+                    CompetencyName = c.CompetencyName,
+                    CompetencyDescription = c.CompetencyDescription,
+                    DisplayOrder = c.DisplayOrder,
+                    IsActive = c.IsActive,
+                    CategoryName = c.Category!.CategoryName,
+                    DomainName = c.Category.Domain!.DomainName
+                })
+                .ToListAsync();
+
+            return Ok(competencies);
+        }
+
+        // GET: api/Competencies/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<CompetencyDto>> GetCompetency(int id)
+        {
+            var competency = await _context.Competencies
+                .Include(c => c.Category)
+                .ThenInclude(cat => cat!.Domain)
+                .Where(c => c.CompetencyID == id && c.IsActive)
+                .Select(c => new CompetencyDto
+                {
+                    CompetencyID = c.CompetencyID,
+                    CategoryID = c.CategoryID,
+                    CompetencyName = c.CompetencyName,
+                    CompetencyDescription = c.CompetencyDescription,
+                    DisplayOrder = c.DisplayOrder,
+                    IsActive = c.IsActive,
+                    CategoryName = c.Category!.CategoryName,
+                    DomainName = c.Category.Domain!.DomainName
+                })
+                .FirstOrDefaultAsync();
+
+            if (competency == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(competency);
+        }
+
+        // POST: api/Competencies
+        [HttpPost]
+        public async Task<ActionResult<CompetencyDto>> CreateCompetency(Competency competency)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            competency.IsActive = true;
+            _context.Competencies.Add(competency);
+            await _context.SaveChangesAsync();
+
+            var competencyDto = new CompetencyDto
+            {
+                CompetencyID = competency.CompetencyID,
+                CategoryID = competency.CategoryID,
+                CompetencyName = competency.CompetencyName,
+                CompetencyDescription = competency.CompetencyDescription,
+                DisplayOrder = competency.DisplayOrder,
+                IsActive = competency.IsActive
+            };
+
+            return CreatedAtAction(nameof(GetCompetency), new { id = competency.CompetencyID }, competencyDto);
+        }
+
+        // PUT: api/Competencies/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateCompetency(int id, Competency competency)
+        {
+            if (id != competency.CompetencyID)
+            {
+                return BadRequest();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var existingCompetency = await _context.Competencies.FindAsync(id);
+            if (existingCompetency == null)
+            {
+                return NotFound();
+            }
+
+            existingCompetency.CategoryID = competency.CategoryID;
+            existingCompetency.CompetencyName = competency.CompetencyName;
+            existingCompetency.CompetencyDescription = competency.CompetencyDescription;
+            existingCompetency.DisplayOrder = competency.DisplayOrder;
+            existingCompetency.IsActive = competency.IsActive;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!CompetencyExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // DELETE: api/Competencies/5
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteCompetency(int id)
+        {
+            var competency = await _context.Competencies.FindAsync(id);
+            if (competency == null)
+            {
+                return NotFound();
+            }
+
+            competency.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private bool CompetencyExists(int id)
+        {
+            return _context.Competencies.Any(e => e.CompetencyID == id);
+        }
+    }
+} 

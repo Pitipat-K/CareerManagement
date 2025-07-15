@@ -1,0 +1,11 @@
+﻿#root {
+    max-width: 1920px;
+    margin: 0 auto;
+    padding: 0rem;
+    text-align: center;
+}
+
+th, td {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}

@@ -1,0 +1,58 @@
+# Node/Vite/React
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.dbmdl
+*.pdb
+*.cache
+*.mdb
+*.exe
+*.dll
+*.app
+*.log
+*.vspscc
+*.vssscc
+*.vsp
+*.psess
+*.pidb
+*.svclog
+*.scc
+TestResults/
+Career_Management.Server/appsettings.json
+Career_Management.Server/Database_info/DB_Connection.txt
+Career_Management.Server/Database_info/Data_Structure.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+.vs/
+*.sw?
+
+# Misc
+.env
+.env.*
+*.local
+
+# Ignore local config and secrets
+Career_Management.Server/Config/*.json
+!Career_Management.Server/Config/assessment-notification-config.json
+!Career_Management.Server/Config/send-email-token.json 
+Career_Management.Server/Config/EmailToken_API.txt
