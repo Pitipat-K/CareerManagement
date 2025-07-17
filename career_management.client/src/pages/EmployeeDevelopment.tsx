@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link } from 'react-router-dom';
-import { User, ClipboardList, ArrowLeft, Menu, X, LogOut } from 'lucide-react';
+import { User, ClipboardList, ArrowLeft, Menu, X, LogOut, PieChart } from 'lucide-react';
 import EmployeeProfile from '../components/EmployeeProfile';
 import CompetencyAssessment from '../components/CompetencyAssessment';
+import CompetencyDashboard from '../components/CompetencyDashboard';
+import { getApiUrl } from '../config/api';
 
 interface Employee {
   employeeID: number;
@@ -40,6 +42,7 @@ const EmployeeDevelopment = () => {
   const menuItems = [
     { path: 'profile', label: 'Profile', icon: User },
     { path: 'assessment', label: 'Competency Assessment', icon: ClipboardList },
+    { path: 'dashboard', label: 'Competency Dashboard', icon: PieChart },
   ];
 
   useEffect(() => {
@@ -54,26 +57,26 @@ const EmployeeDevelopment = () => {
   const fetchEmployeeData = async () => {
     try {
       // 1. Fetch employee
-      const response = await fetch(`https://localhost:7026/api/Employees/${employeeId}`);
+      const response = await fetch(getApiUrl(`Employees/${employeeId}`));
       if (!response.ok) throw new Error('Failed to fetch employee data');
       const employeeData = await response.json();
 
       // 2. Fetch position
-      const positionResponse = await fetch(`https://localhost:7026/api/Positions/${employeeData.positionID}`);
+      const positionResponse = await fetch(getApiUrl(`Positions/${employeeData.positionID}`));
       const positionData = positionResponse.ok ? await positionResponse.json() : {};
 
       // 3. Fetch department
-      const departmentResponse = await fetch(`https://localhost:7026/api/Departments/${positionData.departmentID}`);
+      const departmentResponse = await fetch(getApiUrl(`Departments/${positionData.departmentID}`));
       const departmentData = departmentResponse.ok ? await departmentResponse.json() : {};
 
       // 4. Fetch company
-      const companyResponse = await fetch(`https://localhost:7026/api/Companies/${departmentData.companyID}`);
+      const companyResponse = await fetch(getApiUrl(`Companies/${departmentData.companyID}`));
       const companyData = companyResponse.ok ? await companyResponse.json() : {};
 
       // 5. Fetch manager (employee)
       let managerName = '';
       if (departmentData.managerID) {
-        const managerResponse = await fetch(`https://localhost:7026/api/Employees/${departmentData.managerID}`);
+        const managerResponse = await fetch(getApiUrl(`Employees/${departmentData.managerID}`));
         if (managerResponse.ok) {
           const managerData = await managerResponse.json();
           managerName = `${managerData.firstName} ${managerData.lastName}`;
@@ -244,6 +247,7 @@ const EmployeeDevelopment = () => {
             <Routes>
               <Route path="profile" element={<EmployeeProfile employee={employee} />} />
               <Route path="assessment" element={<CompetencyAssessment employeeId={employeeId} />} />
+              <Route path="dashboard" element={<CompetencyDashboard employeeId={employeeId} />} />
               <Route path="" element={<EmployeeProfile employee={employee} />} />
             </Routes>
           </div>

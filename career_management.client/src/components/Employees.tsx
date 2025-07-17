@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, Search, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 
 interface Employee {
   employeeID: number;
@@ -66,7 +67,7 @@ const Employees = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get('https://localhost:7026/api/employees');
+      const response = await axios.get(getApiUrl('employees'));
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -77,7 +78,7 @@ const Employees = () => {
 
   const fetchPositions = async () => {
     try {
-      const response = await axios.get('https://localhost:7026/api/positions');
+      const response = await axios.get(getApiUrl('positions'));
       setPositions(response.data);
     } catch (error) {
       console.error('Error fetching positions:', error);
@@ -87,7 +88,7 @@ const Employees = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this employee?')) {
       try {
-        await axios.delete(`https://localhost:7026/api/employees/${id}`);
+        await axios.delete(getApiUrl(`employees/${id}`));
         fetchEmployees();
       } catch (error) {
         console.error('Error deleting employee:', error);
@@ -165,14 +166,14 @@ const Employees = () => {
 
       if (editingEmployee) {
         // Update existing employee
-        await axios.put(`https://localhost:7026/api/employees/${editingEmployee.employeeID}`, {
+        await axios.put(getApiUrl(`employees/${editingEmployee.employeeID}`), {
           ...employeeData,
           employeeID: editingEmployee.employeeID,
           createdDate: editingEmployee.createdDate // Preserve original creation date
         });
       } else {
         // Create new employee
-        await axios.post('https://localhost:7026/api/employees', employeeData);
+        await axios.post(getApiUrl('employees'), employeeData);
       }
       
       // Reset form and close modal

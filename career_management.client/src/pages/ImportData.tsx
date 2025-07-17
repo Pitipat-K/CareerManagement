@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Download, Info } from 'lucide-react';
+import { getApiUrl } from '../config/api';
 
 interface ImportResult {
   success: boolean;
@@ -55,7 +56,7 @@ const ImportData = () => {
     formData.append('file', selectedFile);
 
     try {
-      const response = await fetch('https://localhost:7026/api/Employees/import', {
+      const response = await fetch(getApiUrl('Employees/import'), {
         method: 'POST',
         body: formData,
       });
@@ -97,7 +98,7 @@ const ImportData = () => {
   useEffect(() => {
     const fetchPositions = async () => {
       try {
-        const response = await fetch('https://localhost:7026/api/Employees/positions');
+        const response = await fetch(getApiUrl('Employees/positions'));
         if (response.ok) {
           const data = await response.json();
           setPositions(data);

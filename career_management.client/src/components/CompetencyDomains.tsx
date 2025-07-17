@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, Search, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 
 interface CompetencyDomain {
   domainID: number;
@@ -36,7 +37,7 @@ const CompetencyDomains = () => {
 
   const fetchDomains = async () => {
     try {
-      const response = await axios.get('https://localhost:7026/api/competencydomains');
+      const response = await axios.get(getApiUrl('competencydomains'));
       setDomains(response.data);
     } catch (error) {
       console.error('Error fetching domains:', error);
@@ -48,7 +49,7 @@ const CompetencyDomains = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this domain?')) {
       try {
-        await axios.delete(`https://localhost:7026/api/competencydomains/${id}`);
+        await axios.delete(getApiUrl(`competencydomains/${id}`));
         fetchDomains();
       } catch (error) {
         console.error('Error deleting domain:', error);
@@ -96,13 +97,13 @@ const CompetencyDomains = () => {
 
       if (editingDomain) {
         // Update existing domain
-        await axios.put(`https://localhost:7026/api/competencydomains/${editingDomain.domainID}`, {
+        await axios.put(getApiUrl(`competencydomains/${editingDomain.domainID}`), {
           ...domainData,
           domainID: editingDomain.domainID
         });
       } else {
         // Create new domain
-        await axios.post('https://localhost:7026/api/competencydomains', domainData);
+        await axios.post(getApiUrl('competencydomains'), domainData);
       }
       
       // Reset form and close modal

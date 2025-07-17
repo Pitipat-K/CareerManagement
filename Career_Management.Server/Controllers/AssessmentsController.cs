@@ -348,6 +348,116 @@ namespace Career_Management.Server.Controllers
             return Ok(result);
         }
 
+        // GET: api/Assessments/cycle/{cycleId}/combined
+        [HttpGet("cycle/{cycleId}/combined")]
+        public async Task<ActionResult<AssessmentWithCompetenciesDto>> GetCombinedAssessmentView(int cycleId)
+        {
+            Console.WriteLine($"GetCombinedAssessmentView called with cycleId: {cycleId}");
+            
+            var cycle = await _context.AssessmentCycles
+                .Where(ac => ac.CycleID == cycleId && ac.IsActive)
+                .Include(ac => ac.Employee)
+                .Include(ac => ac.SelfAssessment)
+                .Include(ac => ac.ManagerAssessment)
+                .FirstOrDefaultAsync();
+
+            if (cycle == null)
+            {
+                Console.WriteLine($"Assessment cycle {cycleId} not found");
+                return NotFound("Assessment cycle not found");
+            }
+
+            Console.WriteLine($"Found cycle {cycleId}, SelfAssessmentID: {cycle.SelfAssessmentID}, ManagerAssessmentID: {cycle.ManagerAssessmentID}, Status: {cycle.Status}");
+
+            if (cycle.Employee == null)
+            {
+                return BadRequest("Employee not found for this assessment cycle");
+            }
+
+            if (cycle.Employee.PositionID <= 0)
+            {
+                return BadRequest("Employee does not have a valid position assigned");
+            }
+
+            var positionRequirements = await _context.PositionCompetencyRequirements
+                .Where(pcr => pcr.PositionID == cycle.Employee.PositionID && pcr.IsActive)
+                .Include(pcr => pcr.Competency)
+                .ThenInclude(c => c.Category)
+                .ThenInclude(cat => cat.Domain)
+                .ToListAsync();
+
+            Console.WriteLine($"Found {positionRequirements.Count} position requirements");
+
+            var competencies = new List<CompetencyAssessmentDto>();
+
+            foreach (var requirement in positionRequirements)
+            {
+                if (requirement.Competency?.Category?.Domain == null)
+                {
+                    continue;
+                }
+
+                int? selfLevel = null;
+                int? managerLevel = null;
+                string? comments = null;
+
+                // Get self-level from self-assessment
+                if (cycle.SelfAssessmentID.HasValue)
+                {
+                    var selfScore = await _context.CompetencyScores
+                        .Where(cs => cs.AssessmentID == cycle.SelfAssessmentID.Value && cs.CompetencyID == requirement.CompetencyID && cs.IsActive)
+                        .FirstOrDefaultAsync();
+                    selfLevel = selfScore?.CurrentLevel;
+                    Console.WriteLine($"Self score for competency {requirement.CompetencyID}: {selfLevel}");
+                }
+
+                // Get manager-level from manager-assessment
+                if (cycle.ManagerAssessmentID.HasValue)
+                {
+                    var managerScore = await _context.CompetencyScores
+                        .Where(cs => cs.AssessmentID == cycle.ManagerAssessmentID.Value && cs.CompetencyID == requirement.CompetencyID && cs.IsActive)
+                        .FirstOrDefaultAsync();
+                    managerLevel = managerScore?.CurrentLevel;
+                    comments = managerScore?.Comments;
+                    Console.WriteLine($"Manager score for competency {requirement.CompetencyID}: {managerLevel}");
+                }
+
+                competencies.Add(new CompetencyAssessmentDto
+                {
+                    CompetencyID = requirement.CompetencyID,
+                    CompetencyName = requirement.Competency!.CompetencyName,
+                    CategoryName = requirement.Competency.Category!.CategoryName,
+                    DomainName = requirement.Competency.Category.Domain!.DomainName,
+                    RequiredLevel = requirement.RequiredLevel,
+                    SelfLevel = selfLevel,
+                    ManagerLevel = managerLevel,
+                    Comments = comments,
+                    DomainDisplayOrder = requirement.Competency.Category.Domain.DisplayOrder ?? int.MaxValue,
+                    CategoryDisplayOrder = requirement.Competency.Category.DisplayOrder ?? int.MaxValue,
+                    CompetencyDisplayOrder = requirement.Competency.DisplayOrder ?? int.MaxValue
+                });
+            }
+
+            var orderedCompetencies = competencies
+                .OrderBy(c => c.DomainDisplayOrder)
+                .ThenBy(c => c.CategoryDisplayOrder)
+                .ThenBy(c => c.CompetencyDisplayOrder)
+                .ToList();
+
+            Console.WriteLine($"Returning {orderedCompetencies.Count} competencies with manager levels: {orderedCompetencies.Count(c => c.ManagerLevel.HasValue)}");
+
+            var result = new AssessmentWithCompetenciesDto
+            {
+                AssessmentID = cycle.SelfAssessmentID ?? 0, // Use self assessment ID as primary
+                EmployeeID = cycle.EmployeeID,
+                AssessmentPeriod = cycle.AssessmentPeriod,
+                Status = cycle.Status,
+                Competencies = orderedCompetencies
+            };
+
+            return Ok(result);
+        }
+
         // POST: api/Assessments/{id}/scores
         [HttpPost("{id}/scores")]
         public async Task<ActionResult> UpdateCompetencyScore(int id, UpdateCompetencyScoreDto updateDto)
@@ -390,54 +500,74 @@ namespace Career_Management.Server.Controllers
             return Ok();
         }
 
+        // GET: api/Assessments/{id}/status (for testing)
+        [HttpGet("{id}/status")]
+        public async Task<IActionResult> GetAssessmentStatus(int id)
+        {
+            Console.WriteLine($"GetAssessmentStatus called with id: {id}");
+            
+            var assessment = await _context.Assessments.FindAsync(id);
+            if (assessment == null)
+            {
+                Console.WriteLine($"Assessment with id {id} not found");
+                return NotFound();
+            }
+
+            Console.WriteLine($"Found assessment {id} with status: {assessment.Status}");
+            return Ok(new { Status = assessment.Status });
+        }
+
         // PUT: api/Assessments/{id}/status
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateAssessmentStatus(int id, UpdateAssessmentStatusDto statusDto)
         {
+            Console.WriteLine($"UpdateAssessmentStatus called with id: {id}, status: {statusDto.Status}");
+            
             var assessment = await _context.Assessments.FindAsync(id);
             if (assessment == null)
             {
+                Console.WriteLine($"Assessment with id {id} not found");
                 return NotFound();
             }
 
+            Console.WriteLine($"Found assessment {id}, updating status from {assessment.Status} to {statusDto.Status}");
             assessment.Status = statusDto.Status;
             
-            // Set AssessorID to EmployeeID when status is changed to Completed
-            if (statusDto.Status.ToLower() == "completed")
+            // Only set AssessorID to EmployeeID for Self assessments when completed
+            // For Manager assessments, AssessorID should remain as the manager's ID
+            if (statusDto.Status.ToLower() == "completed" && assessment.AssessmentType == "Self")
             {
                 assessment.AssessorID = assessment.EmployeeID;
                 
                 // Activate manager assessment if this is a self assessment being completed
-                if (assessment.AssessmentType == "Self")
+                try
                 {
-                    try
-                    {
-                        // Find the related manager assessment
-                        var managerAssessment = await _context.Assessments
-                            .Where(a => a.RelatedAssessmentID == assessment.AssessmentID && 
-                                      a.AssessmentType == "Manager" && 
-                                      a.IsActive)
-                            .FirstOrDefaultAsync();
+                    // Find the related manager assessment
+                    var managerAssessment = await _context.Assessments
+                        .Where(a => a.RelatedAssessmentID == assessment.AssessmentID && 
+                                  a.AssessmentType == "Manager" && 
+                                  a.IsActive)
+                        .FirstOrDefaultAsync();
 
-                        if (managerAssessment != null)
-                        {
-                            managerAssessment.Status = "In Progress";
-                            managerAssessment.ModifiedDate = DateTime.Now;
-                            Console.WriteLine($"Manager assessment {managerAssessment.AssessmentID} activated to 'In Progress' via status update");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"No manager assessment found for self assessment {assessment.AssessmentID} via status update");
-                        }
-                    }
-                    catch (Exception ex)
+                    if (managerAssessment != null)
                     {
-                        Console.WriteLine($"Error activating manager assessment via status update: {ex.Message}");
+                        managerAssessment.Status = "In Progress";
+                        managerAssessment.ModifiedDate = DateTime.Now;
+                        Console.WriteLine($"Manager assessment {managerAssessment.AssessmentID} activated to 'In Progress' via status update");
                     }
+                    else
+                    {
+                        Console.WriteLine($"No manager assessment found for self assessment {assessment.AssessmentID} via status update");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error activating manager assessment via status update: {ex.Message}");
                 }
             }
             
             await _context.SaveChangesAsync();
+            Console.WriteLine($"Assessment {id} status updated successfully");
 
             return Ok();
         }

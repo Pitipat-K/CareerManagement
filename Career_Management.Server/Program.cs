@@ -33,7 +33,13 @@ builder.Services.AddCors(options =>
                     "http://localhost:5173", 
                     "http://localhost:3000",
                     "https://localhost:52930",
-                    "http://localhost:52930"
+                    "http://localhost:52930",
+                    "https://localhost:44304",
+                    "http://localhost:44304",
+                    "https://localhost:44306",
+                    "http://localhost:44306",
+                    "https://altapi.alliancels.net:44304",
+                    "https://altsmart.alliancels.net:44306"
                 )
                 .AllowAnyHeader()
                 .AllowAnyMethod()
@@ -51,11 +57,11 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+//}
 
 app.UseHttpsRedirection();
 

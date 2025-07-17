@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 
 interface Department {
   departmentID: number;
@@ -56,7 +57,7 @@ const Departments = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await axios.get('https://localhost:7026/api/departments');
+      const response = await axios.get(getApiUrl('departments'));
       setDepartments(response.data);
     } catch (error) {
       console.error('Error fetching departments:', error);
@@ -67,7 +68,7 @@ const Departments = () => {
 
   const fetchCompanies = async () => {
     try {
-      const response = await axios.get('https://localhost:7026/api/companies');
+      const response = await axios.get(getApiUrl('companies'));
       setCompanies(response.data);
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -76,7 +77,7 @@ const Departments = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get('https://localhost:7026/api/employees');
+      const response = await axios.get(getApiUrl('employees'));
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -86,7 +87,7 @@ const Departments = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this department?')) {
       try {
-        await axios.delete(`https://localhost:7026/api/departments/${id}`);
+        await axios.delete(getApiUrl(`departments/${id}`));
         fetchDepartments();
       } catch (error) {
         console.error('Error deleting department:', error);
@@ -139,14 +140,14 @@ const Departments = () => {
 
       if (editingDepartment) {
         // Update existing department
-        await axios.put(`https://localhost:7026/api/departments/${editingDepartment.departmentID}`, {
+        await axios.put(getApiUrl(`departments/${editingDepartment.departmentID}`), {
           ...departmentData,
           departmentID: editingDepartment.departmentID,
           createdDate: editingDepartment.createdDate // Preserve original creation date
         });
       } else {
         // Create new department
-        await axios.post('https://localhost:7026/api/departments', departmentData);
+        await axios.post(getApiUrl('departments'), departmentData);
       }
       
       // Reset form and close modal

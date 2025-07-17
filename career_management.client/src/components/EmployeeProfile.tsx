@@ -1,4 +1,4 @@
-import { User, Mail, Phone, Calendar, MapPin, Building } from 'lucide-react';
+import { User, Mail, Phone, Calendar, Building } from 'lucide-react';
 
 interface Employee {
   employeeID: number;

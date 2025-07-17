@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Send, Settings, Users, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { getApiUrl } from '../config/api';
 
 interface TestEmailRequest {
   employeeName?: string;
@@ -57,7 +58,7 @@ const TestNotification = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await fetch('https://localhost:7026/api/TestNotification/employees-with-managers');
+      const response = await fetch(getApiUrl('TestNotification/employees-with-managers'));
       if (response.ok) {
         const data = await response.json();
         setEmployees(data);
@@ -69,7 +70,7 @@ const TestNotification = () => {
 
   const fetchManagers = async () => {
     try {
-      const response = await fetch('https://localhost:7026/api/TestNotification/managers');
+      const response = await fetch(getApiUrl('TestNotification/managers'));
       if (response.ok) {
         const data = await response.json();
         setManagers(data);
@@ -81,7 +82,7 @@ const TestNotification = () => {
 
   const testConfiguration = async () => {
     try {
-      const response = await fetch('https://localhost:7026/api/TestNotification/test-config');
+      const response = await fetch(getApiUrl('TestNotification/test-config'));
       if (response.ok) {
         const data = await response.json();
         setConfigStatus(data);
@@ -93,7 +94,7 @@ const TestNotification = () => {
 
   const testNotificationService = async () => {
     try {
-      const response = await fetch('https://localhost:7026/api/TestNotification/test-notification-service');
+      const response = await fetch(getApiUrl('TestNotification/test-notification-service'));
       if (response.ok) {
         const data = await response.json();
         setResult(data);
@@ -116,7 +117,7 @@ const TestNotification = () => {
     setResult(null);
 
     try {
-      const response = await fetch('https://localhost:7026/api/TestNotification/send-test-email', {
+      const response = await fetch(getApiUrl('TestNotification/send-test-email'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

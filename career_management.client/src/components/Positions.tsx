@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 
 interface Position {
   positionID: number;
@@ -58,7 +59,7 @@ const Positions = () => {
 
   const fetchPositions = async () => {
     try {
-      const response = await axios.get('https://localhost:7026/api/positions');
+      const response = await axios.get(getApiUrl('positions'));
       setPositions(response.data);
     } catch (error) {
       console.error('Error fetching positions:', error);
@@ -69,7 +70,7 @@ const Positions = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await axios.get('https://localhost:7026/api/departments');
+      const response = await axios.get(getApiUrl('departments'));
       setDepartments(response.data);
     } catch (error) {
       console.error('Error fetching departments:', error);
@@ -79,7 +80,7 @@ const Positions = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this position?')) {
       try {
-        await axios.delete(`https://localhost:7026/api/positions/${id}`);
+        await axios.delete(getApiUrl(`positions/${id}`));
         fetchPositions();
       } catch (error) {
         console.error('Error deleting position:', error);
@@ -148,14 +149,14 @@ const Positions = () => {
 
       if (editingPosition) {
         // Update existing position
-        await axios.put(`https://localhost:7026/api/positions/${editingPosition.positionID}`, {
+        await axios.put(getApiUrl(`positions/${editingPosition.positionID}`), {
           ...positionData,
           positionID: editingPosition.positionID,
           createdDate: editingPosition.createdDate // Preserve original creation date
         });
       } else {
         // Create new position
-        await axios.post('https://localhost:7026/api/positions', positionData);
+        await axios.post(getApiUrl('positions'), positionData);
       }
       
       // Reset form and close modal

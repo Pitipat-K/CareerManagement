@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Building2, ArrowRight } from 'lucide-react';
+import { getApiUrl } from '../config/api';
 
 const Login = () => {
   const [employeeCode, setEmployeeCode] = useState('');
@@ -23,7 +24,7 @@ const Login = () => {
 
     try {
       // Search for employee by employee code
-      const response = await fetch(`https://localhost:7026/api/Employees`);
+      const response = await fetch(getApiUrl('Employees'));
       console.log('API response:', response);
       if (response.ok) {
         const employees = await response.json();
