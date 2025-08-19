@@ -8,6 +8,9 @@ namespace Career_Management.Server.Models.DTOs
         public int? DirectorID { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedDate { get; set; }
+        public DateTime ModifiedDate { get; set; }
+        public int? ModifiedBy { get; set; }
+        public string? ModifiedByEmployeeName { get; set; }
         
         // Department count
         public int DepartmentCount { get; set; }

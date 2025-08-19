@@ -23,6 +23,7 @@ namespace Career_Management.Server.Controllers
         {
             var domains = await _context.CompetencyDomains
                 .Where(d => d.IsActive)
+                .Include(d => d.ModifiedByEmployee)
                 .OrderBy(d => d.DisplayOrder)
                 .ThenBy(d => d.DomainName)
                 .Select(d => new CompetencyDomainDto
@@ -31,7 +32,11 @@ namespace Career_Management.Server.Controllers
                     DomainName = d.DomainName,
                     DomainDescription = d.DomainDescription,
                     DisplayOrder = d.DisplayOrder,
-                    IsActive = d.IsActive
+                    IsActive = d.IsActive,
+                    CreatedDate = d.CreatedDate,
+                    ModifiedDate = d.ModifiedDate,
+                    ModifiedBy = d.ModifiedBy,
+                    ModifiedByEmployeeName = d.ModifiedByEmployee != null ? $"{d.ModifiedByEmployee.FirstName} {d.ModifiedByEmployee.LastName}" : null
                 })
                 .ToListAsync();
 
@@ -44,13 +49,18 @@ namespace Career_Management.Server.Controllers
         {
             var domain = await _context.CompetencyDomains
                 .Where(d => d.DomainID == id && d.IsActive)
+                .Include(d => d.ModifiedByEmployee)
                 .Select(d => new CompetencyDomainDto
                 {
                     DomainID = d.DomainID,
                     DomainName = d.DomainName,
                     DomainDescription = d.DomainDescription,
                     DisplayOrder = d.DisplayOrder,
-                    IsActive = d.IsActive
+                    IsActive = d.IsActive,
+                    CreatedDate = d.CreatedDate,
+                    ModifiedDate = d.ModifiedDate,
+                    ModifiedBy = d.ModifiedBy,
+                    ModifiedByEmployeeName = d.ModifiedByEmployee != null ? $"{d.ModifiedByEmployee.FirstName} {d.ModifiedByEmployee.LastName}" : null
                 })
                 .FirstOrDefaultAsync();
 
@@ -72,6 +82,8 @@ namespace Career_Management.Server.Controllers
             }
 
             domain.IsActive = true;
+            domain.CreatedDate = DateTime.Now;
+            domain.ModifiedDate = DateTime.Now;
             _context.CompetencyDomains.Add(domain);
             await _context.SaveChangesAsync();
 
@@ -81,7 +93,11 @@ namespace Career_Management.Server.Controllers
                 DomainName = domain.DomainName,
                 DomainDescription = domain.DomainDescription,
                 DisplayOrder = domain.DisplayOrder,
-                IsActive = domain.IsActive
+                IsActive = domain.IsActive,
+                CreatedDate = domain.CreatedDate,
+                ModifiedDate = domain.ModifiedDate,
+                ModifiedBy = domain.ModifiedBy,
+                ModifiedByEmployeeName = null // Will be populated when retrieved
             };
 
             return CreatedAtAction(nameof(GetCompetencyDomain), new { id = domain.DomainID }, domainDto);
@@ -111,6 +127,8 @@ namespace Career_Management.Server.Controllers
             existingDomain.DomainDescription = domain.DomainDescription;
             existingDomain.DisplayOrder = domain.DisplayOrder;
             existingDomain.IsActive = domain.IsActive;
+            existingDomain.ModifiedDate = DateTime.Now;
+            existingDomain.ModifiedBy = domain.ModifiedBy;
 
             try
             {
@@ -133,7 +151,7 @@ namespace Career_Management.Server.Controllers
 
         // DELETE: api/CompetencyDomains/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCompetencyDomain(int id)
+        public async Task<IActionResult> DeleteCompetencyDomain(int id, [FromQuery] int? modifiedBy)
         {
             var domain = await _context.CompetencyDomains.FindAsync(id);
             if (domain == null)
@@ -151,6 +169,8 @@ namespace Career_Management.Server.Controllers
             }
 
             domain.IsActive = false;
+            domain.ModifiedDate = DateTime.Now;
+            domain.ModifiedBy = modifiedBy;
             await _context.SaveChangesAsync();
 
             return NoContent();

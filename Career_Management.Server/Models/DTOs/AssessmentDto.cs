@@ -53,6 +53,7 @@ namespace Career_Management.Server.Models.DTOs
         public int CompetencyID { get; set; }
         public int CurrentLevel { get; set; }
         public string? Comments { get; set; }
+        public int? ModifiedBy { get; set; }
     }
 
     public class UpdateAssessmentStatusDto

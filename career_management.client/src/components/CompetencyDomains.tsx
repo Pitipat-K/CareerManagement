@@ -9,6 +9,10 @@ interface CompetencyDomain {
   domainDescription?: string;
   displayOrder?: number;
   isActive: boolean;
+  createdDate?: string;
+  modifiedDate?: string;
+  modifiedBy?: number;
+  modifiedByEmployeeName?: string;
 }
 
 interface CompetencyDomainFormData {
@@ -35,6 +39,19 @@ const CompetencyDomains = () => {
     fetchDomains();
   }, []);
 
+  const getCurrentEmployeeId = (): number | null => {
+    try {
+      const currentEmployee = localStorage.getItem('currentEmployee');
+      if (currentEmployee) {
+        const employee = JSON.parse(currentEmployee);
+        return employee.employeeID || null;
+      }
+    } catch (error) {
+      console.error('Error parsing currentEmployee from localStorage:', error);
+    }
+    return null;
+  };
+
   const fetchDomains = async () => {
     try {
       const response = await axios.get(getApiUrl('competencydomains'));
@@ -49,7 +66,12 @@ const CompetencyDomains = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this domain?')) {
       try {
-        await axios.delete(getApiUrl(`competencydomains/${id}`));
+        const currentEmployeeId = getCurrentEmployeeId();
+        const url = currentEmployeeId 
+          ? getApiUrl(`competencydomains/${id}?modifiedBy=${currentEmployeeId}`)
+          : getApiUrl(`competencydomains/${id}`);
+        
+        await axios.delete(url);
         fetchDomains();
       } catch (error) {
         console.error('Error deleting domain:', error);
@@ -88,11 +110,13 @@ const CompetencyDomains = () => {
 
     setSubmitting(true);
     try {
+      const currentEmployeeId = getCurrentEmployeeId();
       const domainData = {
         domainName: formData.domainName.trim(),
         domainDescription: formData.domainDescription.trim() || null,
         displayOrder: formData.displayOrder.trim() ? parseInt(formData.displayOrder) : null,
-        isActive: true
+        isActive: true,
+        modifiedBy: currentEmployeeId
       };
 
       if (editingDomain) {
@@ -217,13 +241,13 @@ const CompetencyDomains = () => {
                 <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   No.
                 </th>
-                <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Domain Name
                 </th>
-                <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Description
                 </th>
-                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -231,34 +255,34 @@ const CompetencyDomains = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredDomains.map((domain, index) => (
                 <tr key={domain.domainID} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
+                    <div className="text-sm text-gray-900 text-center">
                       {index + 1}
                     </div>
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-gray-900 text-left">
                       {domain.domainName}
                     </div>
                   </td>
                   <td className="px-3 sm:px-6 py-4">
-                    <div className="text-sm text-gray-900 max-w-xs truncate">
+                    <div className="text-sm text-gray-900 max-w-xs truncate text-left">
                       {domain.domainDescription || '-'}
                     </div>
                   </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
+                  <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <div className="flex items-center justify-center space-x-1">
                       <button
                         onClick={() => handleEditDomain(domain)}
                         className="text-blue-600 hover:text-blue-900 p-1"
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => handleDelete(domain.domainID)}
                         className="text-red-600 hover:text-red-900 p-1"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   </td>

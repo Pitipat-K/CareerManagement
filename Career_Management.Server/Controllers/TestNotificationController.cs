@@ -174,8 +174,8 @@ namespace Career_Management.Server.Controllers
                         EmployeeEmail = e.Email,
                         PositionTitle = e.Position != null ? e.Position.PositionTitle : "Unknown",
                         DepartmentName = e.Position != null && e.Position.DepartmentNavigation != null ? e.Position.DepartmentNavigation.DepartmentName : "Unknown",
-                        ManagerID = e.Position != null && e.Position.DepartmentNavigation != null ? e.Position.DepartmentNavigation.ManagerID : (int?)null,
-                        HasManager = e.Position != null && e.Position.DepartmentNavigation != null && e.Position.DepartmentNavigation.ManagerID != null
+                        ManagerID = e.ManagerID,
+                        HasManager = e.ManagerID != null
                     })
                     .ToListAsync();
 

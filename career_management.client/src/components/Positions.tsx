@@ -3,6 +3,14 @@ import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
 
+interface JobGrade {
+  jobGradeID: number;
+  jobGradeName: string;
+  jobGradeDescription?: string;
+  jobGradeLevel?: number;
+  isActive: boolean;
+}
+
 interface Position {
   positionID: number;
   positionTitle: string;
@@ -10,17 +18,27 @@ interface Position {
   experienceRequirement?: number;
   jobGroup?: string;
   jobFunction?: string;
-  jobGrade?: string;
+  jobGradeID?: number;
+  jobGradeName?: string;
   departmentID?: number;
   departmentName?: string;
+  leadershipID: number;
+  leadershipLevel?: string;
   isActive: boolean;
   createdDate: string;
   modifiedDate: string;
+  modifiedBy?: number;
+  modifiedByEmployeeName?: string;
 }
 
 interface Department {
   departmentID: number;
   departmentName: string;
+}
+
+interface LeadershipLevel {
+  leadershipID: number;
+  levelName: string;
 }
 
 interface PositionFormData {
@@ -29,13 +47,16 @@ interface PositionFormData {
   experienceRequirement: string;
   jobGroup: string;
   jobFunction: string;
-  jobGrade: string;
+  jobGradeID: string;
   departmentID: string;
+  leadershipID: string;
 }
 
 const Positions = () => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [leadershipLevels, setLeadershipLevels] = useState<LeadershipLevel[]>([]);
+  const [jobGrades, setJobGrades] = useState<JobGrade[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -47,14 +68,23 @@ const Positions = () => {
     experienceRequirement: '',
     jobGroup: '',
     jobFunction: '',
-    jobGrade: '',
-    departmentID: ''
+    jobGradeID: '',
+    departmentID: '',
+    leadershipID: ''
   });
   const [errors, setErrors] = useState<Partial<PositionFormData>>({});
+
+  // Get current employee ID from localStorage
+  const getCurrentEmployeeId = (): number | null => {
+    const currentEmployee = localStorage.getItem('currentEmployee');
+    return currentEmployee ? JSON.parse(currentEmployee).employeeID : null;
+  };
 
   useEffect(() => {
     fetchPositions();
     fetchDepartments();
+    fetchLeadershipLevels();
+    fetchJobGrades();
   }, []);
 
   const fetchPositions = async () => {
@@ -77,13 +107,38 @@ const Positions = () => {
     }
   };
 
+  const fetchLeadershipLevels = async () => {
+    try {
+      const response = await axios.get(getApiUrl('leadershiplevels'));
+      setLeadershipLevels(response.data);
+    } catch (error) {
+      console.error('Error fetching leadership levels:', error);
+    }
+  };
+
+  const fetchJobGrades = async () => {
+    try {
+      const response = await axios.get(getApiUrl('positions/jobgrades'));
+      setJobGrades(response.data);
+    } catch (error) {
+      console.error('Error fetching job grades:', error);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this position?')) {
       try {
-        await axios.delete(getApiUrl(`positions/${id}`));
+        const currentEmployeeId = getCurrentEmployeeId();
+        if (!currentEmployeeId) {
+          alert('Please log in to perform this action.');
+          return;
+        }
+        
+        await axios.delete(getApiUrl(`positions/${id}?modifiedBy=${currentEmployeeId}`));
         fetchPositions();
       } catch (error) {
         console.error('Error deleting position:', error);
+        alert('Failed to delete position. Please try again.');
       }
     }
   };
@@ -113,12 +168,18 @@ const Positions = () => {
       newErrors.jobFunction = 'Job function must be 200 characters or less';
     }
 
-    if (formData.jobGrade.trim().length > 20) {
-      newErrors.jobGrade = 'Job grade must be 20 characters or less';
+    if (formData.jobGradeID.trim() && isNaN(Number(formData.jobGradeID))) {
+      newErrors.jobGradeID = 'Job grade must be a valid selection';
     }
 
     if (formData.departmentID.trim() && isNaN(Number(formData.departmentID))) {
       newErrors.departmentID = 'Department ID must be a valid number';
+    }
+
+    if (!formData.leadershipID.trim()) {
+      newErrors.leadershipID = 'Leadership level is required';
+    } else if (isNaN(Number(formData.leadershipID))) {
+      newErrors.leadershipID = 'Leadership level must be a valid number';
     }
 
     setErrors(newErrors);
@@ -132,6 +193,12 @@ const Positions = () => {
       return;
     }
 
+    const currentEmployeeId = getCurrentEmployeeId();
+    if (!currentEmployeeId) {
+      alert('Please log in to perform this action.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const positionData = {
@@ -140,11 +207,13 @@ const Positions = () => {
         experienceRequirement: formData.experienceRequirement.trim() ? parseInt(formData.experienceRequirement) : null,
         jobGroup: formData.jobGroup.trim() || null,
         jobFunction: formData.jobFunction.trim() || null,
-        jobGrade: formData.jobGrade.trim() || null,
+        jobGradeID: formData.jobGradeID.trim() ? parseInt(formData.jobGradeID) : null,
         departmentID: formData.departmentID.trim() ? parseInt(formData.departmentID) : null,
+        leadershipID: formData.leadershipID.trim() ? parseInt(formData.leadershipID) : 1,
         isActive: true,
         createdDate: new Date().toISOString(),
-        modifiedDate: new Date().toISOString()
+        modifiedDate: new Date().toISOString(),
+        modifiedBy: currentEmployeeId
       };
 
       if (editingPosition) {
@@ -166,8 +235,9 @@ const Positions = () => {
         experienceRequirement: '',
         jobGroup: '',
         jobFunction: '',
-        jobGrade: '',
-        departmentID: ''
+        jobGradeID: '',
+        departmentID: '',
+        leadershipID: ''
       });
       setErrors({});
       setShowModal(false);
@@ -200,8 +270,9 @@ const Positions = () => {
       experienceRequirement: '',
       jobGroup: '',
       jobFunction: '',
-      jobGrade: '',
-      departmentID: ''
+      jobGradeID: '',
+      departmentID: '',
+      leadershipID: ''
     });
     setErrors({});
   };
@@ -214,8 +285,9 @@ const Positions = () => {
       experienceRequirement: position.experienceRequirement?.toString() || '',
       jobGroup: position.jobGroup || '',
       jobFunction: position.jobFunction || '',
-      jobGrade: position.jobGrade || '',
-      departmentID: position.departmentID?.toString() || ''
+      jobGradeID: position.jobGradeID?.toString() || '',
+      departmentID: position.departmentID?.toString() || '',
+      leadershipID: position.leadershipID?.toString() || ''
     });
     setShowModal(true);
   };
@@ -295,11 +367,15 @@ const Positions = () => {
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">Job Grade:</span>
-                  <p className="text-gray-900">{position.jobGrade || '-'}</p>
+                  <p className="text-gray-900">{position.jobGradeName || '-'}</p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">Experience:</span>
                   <p className="text-gray-900">{position.experienceRequirement ? `${position.experienceRequirement} years` : '-'}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Leadership Level:</span>
+                  <p className="text-gray-900">{position.leadershipLevel || '-'}</p>
                 </div>
               </div>
             </div>
@@ -316,17 +392,20 @@ const Positions = () => {
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-16">
                   No.
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Position Title
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Department
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Job Group
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Job Grade
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                  Leadership Level
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Actions
@@ -341,36 +420,39 @@ const Positions = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 text-left">
                         {position.positionTitle}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 text-left">
                         {position.positionDescription}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
                     {position.departmentName || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
                     {position.jobGroup || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {position.jobGrade || '-'}
+                    {position.jobGradeName || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
+                    {position.leadershipLevel || '-'}
+                  </td>
+                  <td className="px-2 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-1">
                       <button 
                         onClick={() => handleEditPosition(position)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="text-blue-600 hover:text-blue-900 p-1"
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => handleDelete(position.positionID)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-600 hover:text-red-900 p-1"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   </td>
@@ -469,22 +551,26 @@ const Positions = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="jobGrade" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="jobGradeID" className="block text-sm font-medium text-gray-700 mb-1">
                     Job Grade
                   </label>
-                  <input
-                    type="text"
-                    id="jobGrade"
-                    value={formData.jobGrade}
-                    onChange={(e) => handleInputChange('jobGrade', e.target.value)}
+                  <select
+                    id="jobGradeID"
+                    value={formData.jobGradeID}
+                    onChange={(e) => handleInputChange('jobGradeID', e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.jobGrade ? 'border-red-500' : 'border-gray-300'
+                      errors.jobGradeID ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    placeholder="e.g., A1, B2"
-                    maxLength={20}
-                  />
-                  {errors.jobGrade && (
-                    <p className="mt-1 text-sm text-red-600">{errors.jobGrade}</p>
+                  >
+                    <option value="">Select a job grade</option>
+                    {jobGrades.map((grade) => (
+                      <option key={grade.jobGradeID} value={grade.jobGradeID}>
+                        {grade.jobGradeName}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.jobGradeID && (
+                    <p className="mt-1 text-sm text-red-600">{errors.jobGradeID}</p>
                   )}
                 </div>
               </div>
@@ -550,6 +636,30 @@ const Positions = () => {
                 </select>
                 {errors.departmentID && (
                   <p className="mt-1 text-sm text-red-600">{errors.departmentID}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="leadershipID" className="block text-sm font-medium text-gray-700 mb-1">
+                  Leadership Level *
+                </label>
+                <select
+                  id="leadershipID"
+                  value={formData.leadershipID}
+                  onChange={(e) => handleInputChange('leadershipID', e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.leadershipID ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Select a leadership level</option>
+                  {leadershipLevels.map((level) => (
+                    <option key={level.leadershipID} value={level.leadershipID}>
+                      {level.levelName}
+                    </option>
+                  ))}
+                </select>
+                {errors.leadershipID && (
+                  <p className="mt-1 text-sm text-red-600">{errors.leadershipID}</p>
                 )}
               </div>
 

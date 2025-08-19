@@ -9,5 +9,9 @@ namespace Career_Management.Server.Models.DTOs
         public int? DisplayOrder { get; set; }
         public bool IsActive { get; set; }
         public string? DomainName { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime ModifiedDate { get; set; }
+        public int? ModifiedBy { get; set; }
+        public string? ModifiedByEmployeeName { get; set; }
     }
 } 

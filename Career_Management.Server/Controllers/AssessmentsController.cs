@@ -133,11 +133,11 @@ namespace Career_Management.Server.Controllers
                 await _context.SaveChangesAsync();
                 Console.WriteLine($"Self assessment created with ID: {selfAssessment.AssessmentID}");
 
-                // 3. Get employee's manager (assuming manager is in the same department)
+                // 3. Get employee's manager from employee's ManagerID
                 int? managerId = null;
-                if (existingEmployee?.Position?.DepartmentNavigation?.ManagerID != null)
+                if (existingEmployee?.ManagerID != null)
                 {
-                    managerId = existingEmployee.Position.DepartmentNavigation.ManagerID;
+                    managerId = existingEmployee.ManagerID;
                 }
 
                 // 4. Create Manager Assessment (but keep it inactive until self is complete)
@@ -480,6 +480,8 @@ namespace Career_Management.Server.Controllers
                 // Update existing score
                 existingScore.CurrentLevel = updateDto.CurrentLevel;
                 existingScore.Comments = updateDto.Comments;
+                existingScore.ModifiedDate = DateTime.Now;
+                existingScore.ModifiedBy = updateDto.ModifiedBy;
             }
             else
             {
@@ -490,7 +492,10 @@ namespace Career_Management.Server.Controllers
                     CompetencyID = updateDto.CompetencyID,
                     CurrentLevel = updateDto.CurrentLevel,
                     Comments = updateDto.Comments,
-                    IsActive = true
+                    IsActive = true,
+                    CreatedDate = DateTime.Now,
+                    ModifiedDate = DateTime.Now,
+                    ModifiedBy = updateDto.ModifiedBy
                 };
                 _context.CompetencyScores.Add(newScore);
             }
@@ -625,9 +630,9 @@ namespace Career_Management.Server.Controllers
                     return requirement != null && cs.CurrentLevel < requirement.RequiredLevel;
                 });
 
-                // Get the employee's manager from their department
+                // Get the employee's manager from employee's ManagerID
                 var employee = assessment.Employee;
-                var managerId = employee?.Position?.DepartmentNavigation?.ManagerID;
+                var managerId = employee?.ManagerID;
                 Employee manager = null;
                 if (managerId.HasValue)
                 {

@@ -24,6 +24,7 @@ namespace Career_Management.Server.Controllers
             var companies = await _context.Companies
                 .Where(c => c.IsActive)
                 .Include(c => c.Departments)
+                .Include(c => c.ModifiedByEmployee)
                 .ToListAsync();
 
             var companyDtos = companies.Select(c => new CompanyDto
@@ -34,6 +35,9 @@ namespace Career_Management.Server.Controllers
                 DirectorID = c.DirectorID,
                 IsActive = c.IsActive,
                 CreatedDate = c.CreatedDate,
+                ModifiedDate = c.ModifiedDate,
+                ModifiedBy = c.ModifiedBy,
+                ModifiedByEmployeeName = c.ModifiedByEmployee != null ? $"{c.ModifiedByEmployee.FirstName} {c.ModifiedByEmployee.LastName}" : null,
                 DepartmentCount = c.Departments.Count,
                 DirectorName = c.DirectorID.HasValue ? 
                     _context.Employees
@@ -51,6 +55,7 @@ namespace Career_Management.Server.Controllers
         {
             var company = await _context.Companies
                 .Include(c => c.Departments)
+                .Include(c => c.ModifiedByEmployee)
                 .FirstOrDefaultAsync(c => c.CompanyID == id && c.IsActive);
 
             if (company == null)
@@ -66,6 +71,9 @@ namespace Career_Management.Server.Controllers
                 DirectorID = company.DirectorID,
                 IsActive = company.IsActive,
                 CreatedDate = company.CreatedDate,
+                ModifiedDate = company.ModifiedDate,
+                ModifiedBy = company.ModifiedBy,
+                ModifiedByEmployeeName = company.ModifiedByEmployee != null ? $"{company.ModifiedByEmployee.FirstName} {company.ModifiedByEmployee.LastName}" : null,
                 DepartmentCount = company.Departments.Count,
                 DirectorName = company.DirectorID.HasValue ? 
                     _context.Employees
@@ -82,6 +90,7 @@ namespace Career_Management.Server.Controllers
         public async Task<ActionResult<Company>> CreateCompany(Company company)
         {
             company.CreatedDate = DateTime.Now;
+            company.ModifiedDate = DateTime.Now;
             company.IsActive = true;
             
             _context.Companies.Add(company);
@@ -100,7 +109,7 @@ namespace Career_Management.Server.Controllers
             }
 
             var existingCompany = await _context.Companies.FindAsync(id);
-            if (existingCompany == null || !existingCompany.IsActive)
+            if (existingCompany == null)
             {
                 return NotFound();
             }
@@ -108,6 +117,9 @@ namespace Career_Management.Server.Controllers
             existingCompany.CompanyName = company.CompanyName;
             existingCompany.Description = company.Description;
             existingCompany.DirectorID = company.DirectorID;
+            existingCompany.IsActive = company.IsActive;
+            existingCompany.ModifiedDate = DateTime.Now;
+            existingCompany.ModifiedBy = company.ModifiedBy;
 
             try
             {
@@ -130,15 +142,17 @@ namespace Career_Management.Server.Controllers
 
         // DELETE: api/Companies/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCompany(int id)
+        public async Task<IActionResult> DeleteCompany(int id, [FromQuery] int? modifiedBy)
         {
             var company = await _context.Companies.FindAsync(id);
-            if (company == null || !company.IsActive)
+            if (company == null)
             {
                 return NotFound();
             }
 
             company.IsActive = false;
+            company.ModifiedDate = DateTime.Now;
+            company.ModifiedBy = modifiedBy;
             await _context.SaveChangesAsync();
 
             return NoContent();

@@ -23,6 +23,7 @@ namespace Career_Management.Server.Controllers
         {
             var categories = await _context.CompetencyCategories
                 .Include(c => c.Domain)
+                .Include(c => c.ModifiedByEmployee)
                 .Where(c => c.IsActive)
                 .OrderBy(c => c.DisplayOrder)
                 .ThenBy(c => c.CategoryName)
@@ -34,7 +35,11 @@ namespace Career_Management.Server.Controllers
                     CategoryDescription = c.CategoryDescription,
                     DisplayOrder = c.DisplayOrder,
                     IsActive = c.IsActive,
-                    DomainName = c.Domain!.DomainName
+                    DomainName = c.Domain!.DomainName,
+                    CreatedDate = c.CreatedDate,
+                    ModifiedDate = c.ModifiedDate,
+                    ModifiedBy = c.ModifiedBy,
+                    ModifiedByEmployeeName = c.ModifiedByEmployee != null ? $"{c.ModifiedByEmployee.FirstName} {c.ModifiedByEmployee.LastName}" : null
                 })
                 .ToListAsync();
 
@@ -47,6 +52,7 @@ namespace Career_Management.Server.Controllers
         {
             var category = await _context.CompetencyCategories
                 .Include(c => c.Domain)
+                .Include(c => c.ModifiedByEmployee)
                 .Where(c => c.CategoryID == id && c.IsActive)
                 .Select(c => new CompetencyCategoryDto
                 {
@@ -56,7 +62,11 @@ namespace Career_Management.Server.Controllers
                     CategoryDescription = c.CategoryDescription,
                     DisplayOrder = c.DisplayOrder,
                     IsActive = c.IsActive,
-                    DomainName = c.Domain!.DomainName
+                    DomainName = c.Domain!.DomainName,
+                    CreatedDate = c.CreatedDate,
+                    ModifiedDate = c.ModifiedDate,
+                    ModifiedBy = c.ModifiedBy,
+                    ModifiedByEmployeeName = c.ModifiedByEmployee != null ? $"{c.ModifiedByEmployee.FirstName} {c.ModifiedByEmployee.LastName}" : null
                 })
                 .FirstOrDefaultAsync();
 
@@ -78,6 +88,8 @@ namespace Career_Management.Server.Controllers
             }
 
             category.IsActive = true;
+            category.CreatedDate = DateTime.Now;
+            category.ModifiedDate = DateTime.Now;
             _context.CompetencyCategories.Add(category);
             await _context.SaveChangesAsync();
 
@@ -88,7 +100,11 @@ namespace Career_Management.Server.Controllers
                 CategoryName = category.CategoryName,
                 CategoryDescription = category.CategoryDescription,
                 DisplayOrder = category.DisplayOrder,
-                IsActive = category.IsActive
+                IsActive = category.IsActive,
+                CreatedDate = category.CreatedDate,
+                ModifiedDate = category.ModifiedDate,
+                ModifiedBy = category.ModifiedBy,
+                ModifiedByEmployeeName = null // Will be populated when retrieved
             };
 
             return CreatedAtAction(nameof(GetCompetencyCategory), new { id = category.CategoryID }, categoryDto);
@@ -119,6 +135,8 @@ namespace Career_Management.Server.Controllers
             existingCategory.CategoryDescription = category.CategoryDescription;
             existingCategory.DisplayOrder = category.DisplayOrder;
             existingCategory.IsActive = category.IsActive;
+            existingCategory.ModifiedDate = DateTime.Now;
+            existingCategory.ModifiedBy = category.ModifiedBy;
 
             try
             {
@@ -141,7 +159,7 @@ namespace Career_Management.Server.Controllers
 
         // DELETE: api/CompetencyCategories/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCompetencyCategory(int id)
+        public async Task<IActionResult> DeleteCompetencyCategory(int id, [FromQuery] int? modifiedBy)
         {
             var category = await _context.CompetencyCategories.FindAsync(id);
             if (category == null)
@@ -159,6 +177,8 @@ namespace Career_Management.Server.Controllers
             }
 
             category.IsActive = false;
+            category.ModifiedDate = DateTime.Now;
+            category.ModifiedBy = modifiedBy;
             await _context.SaveChangesAsync();
 
             return NoContent();

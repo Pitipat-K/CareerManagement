@@ -24,6 +24,7 @@ namespace Career_Management.Server.Controllers
             var departments = await _context.Departments
                 .Where(d => d.IsActive)
                 .Include(d => d.Company)
+                .Include(d => d.ModifiedByEmployee)
                 .ToListAsync();
 
             var departmentDtos = departments.Select(d => new DepartmentDto
@@ -35,6 +36,9 @@ namespace Career_Management.Server.Controllers
                 ManagerID = d.ManagerID,
                 IsActive = d.IsActive,
                 CreatedDate = d.CreatedDate,
+                ModifiedDate = d.ModifiedDate,
+                ModifiedBy = d.ModifiedBy,
+                ModifiedByEmployeeName = d.ModifiedByEmployee != null ? $"{d.ModifiedByEmployee.FirstName} {d.ModifiedByEmployee.LastName}" : null,
                 CompanyName = d.Company != null ? d.Company.CompanyName : null,
                 ManagerName = d.ManagerID.HasValue ? 
                     _context.Employees
@@ -52,6 +56,7 @@ namespace Career_Management.Server.Controllers
         {
             var department = await _context.Departments
                 .Include(d => d.Company)
+                .Include(d => d.ModifiedByEmployee)
                 .FirstOrDefaultAsync(d => d.DepartmentID == id && d.IsActive);
 
             if (department == null)
@@ -68,6 +73,9 @@ namespace Career_Management.Server.Controllers
                 ManagerID = department.ManagerID,
                 IsActive = department.IsActive,
                 CreatedDate = department.CreatedDate,
+                ModifiedDate = department.ModifiedDate,
+                ModifiedBy = department.ModifiedBy,
+                ModifiedByEmployeeName = department.ModifiedByEmployee != null ? $"{department.ModifiedByEmployee.FirstName} {department.ModifiedByEmployee.LastName}" : null,
                 CompanyName = department.Company != null ? department.Company.CompanyName : null,
                 ManagerName = department.ManagerID.HasValue ? 
                     _context.Employees
@@ -84,6 +92,7 @@ namespace Career_Management.Server.Controllers
         public async Task<ActionResult<Department>> CreateDepartment(Department department)
         {
             department.CreatedDate = DateTime.Now;
+            department.ModifiedDate = DateTime.Now;
             department.IsActive = true;
             
             _context.Departments.Add(department);
@@ -102,15 +111,18 @@ namespace Career_Management.Server.Controllers
             }
 
             var existingDepartment = await _context.Departments.FindAsync(id);
-            if (existingDepartment == null || !existingDepartment.IsActive)
+            if (existingDepartment == null)
             {
                 return NotFound();
             }
 
+            existingDepartment.CompanyID = department.CompanyID;
             existingDepartment.DepartmentName = department.DepartmentName;
             existingDepartment.Description = department.Description;
-            existingDepartment.CompanyID = department.CompanyID;
             existingDepartment.ManagerID = department.ManagerID;
+            existingDepartment.IsActive = department.IsActive;
+            existingDepartment.ModifiedDate = DateTime.Now;
+            existingDepartment.ModifiedBy = department.ModifiedBy;
 
             try
             {
@@ -133,15 +145,17 @@ namespace Career_Management.Server.Controllers
 
         // DELETE: api/Departments/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteDepartment(int id)
+        public async Task<IActionResult> DeleteDepartment(int id, [FromQuery] int? modifiedBy)
         {
             var department = await _context.Departments.FindAsync(id);
-            if (department == null || !department.IsActive)
+            if (department == null)
             {
                 return NotFound();
             }
 
             department.IsActive = false;
+            department.ModifiedDate = DateTime.Now;
+            department.ModifiedBy = modifiedBy;
             await _context.SaveChangesAsync();
 
             return NoContent();

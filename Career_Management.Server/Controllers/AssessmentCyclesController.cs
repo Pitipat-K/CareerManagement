@@ -116,16 +116,15 @@ namespace Career_Management.Server.Controllers
                 _context.Assessments.Add(selfAssessment);
                 await _context.SaveChangesAsync();
 
-                // 3. Get employee's manager (assuming manager is in the same department)
+                // 3. Get employee's manager from employee's ManagerID
                 var employee = await _context.Employees
-                    .Include(e => e.Position)
-                    .ThenInclude(p => p.DepartmentNavigation)
+                    .Include(e => e.Manager)
                     .FirstOrDefaultAsync(e => e.EmployeeID == createDto.EmployeeID);
 
                 int? managerId = null;
-                if (employee?.Position?.DepartmentNavigation?.ManagerID != null)
+                if (employee?.ManagerID != null)
                 {
-                    managerId = employee.Position.DepartmentNavigation.ManagerID;
+                    managerId = employee.ManagerID;
                 }
 
                 // 4. Create Manager Assessment (but keep it inactive until self is complete)
@@ -300,9 +299,9 @@ namespace Career_Management.Server.Controllers
                 Console.WriteLine($"Manager Assessment ID: {cycle.ManagerAssessmentID}");
                 Console.WriteLine($"Manager Assessor ID: {cycle.ManagerAssessment?.AssessorID}");
                 
-                // Get the employee's manager from their department
+                // Get the employee's manager from employee's ManagerID
                 var employee = cycle.Employee;
-                var managerId = employee?.Position?.DepartmentNavigation?.ManagerID;
+                var managerId = employee?.ManagerID;
                 Employee manager = null;
                 if (managerId.HasValue)
                 {

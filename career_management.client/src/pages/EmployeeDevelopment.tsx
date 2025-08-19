@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link } from 'react-router-dom';
-import { User, ClipboardList, ArrowLeft, Menu, X, LogOut, PieChart } from 'lucide-react';
+import { User, ClipboardList, ArrowLeft, Menu, X, LogOut, PieChart, TrendingUp, Map, ChevronLeft, ChevronRight } from 'lucide-react';
 import EmployeeProfile from '../components/EmployeeProfile';
 import CompetencyAssessment from '../components/CompetencyAssessment';
 import CompetencyDashboard from '../components/CompetencyDashboard';
+import DevelopmentPlan from '../components/DevelopmentPlan';
+import CareerNavigator from '../components/CareerNavigator';
+import CareerPath from '../components/CareerPath';
 import { getApiUrl } from '../config/api';
 
 interface Employee {
@@ -36,6 +39,7 @@ const EmployeeDevelopment = () => {
 
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -43,6 +47,9 @@ const EmployeeDevelopment = () => {
     { path: 'profile', label: 'Profile', icon: User },
     { path: 'assessment', label: 'Competency Assessment', icon: ClipboardList },
     { path: 'dashboard', label: 'Competency Dashboard', icon: PieChart },
+    { path: 'development-plan', label: 'Development Plan', icon: ClipboardList },
+    { path: 'career-navigator', label: 'Career Navigator', icon: TrendingUp },
+    { path: 'career-path', label: 'Career Path', icon: Map },
   ];
 
   useEffect(() => {
@@ -75,8 +82,8 @@ const EmployeeDevelopment = () => {
 
       // 5. Fetch manager (employee)
       let managerName = '';
-      if (departmentData.managerID) {
-        const managerResponse = await fetch(getApiUrl(`Employees/${departmentData.managerID}`));
+      if (employeeData.managerID) {
+        const managerResponse = await fetch(getApiUrl(`Employees/${employeeData.managerID}`));
         if (managerResponse.ok) {
           const managerData = await managerResponse.json();
           managerName = `${managerData.firstName} ${managerData.lastName}`;
@@ -176,8 +183,9 @@ const EmployeeDevelopment = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className={`
-          fixed inset-y-0 left-0 z-50 w-72 sm:w-80 lg:w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0
+          fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${sidebarCollapsed ? 'w-16 lg:w-16' : 'w-72 sm:w-80 lg:w-64'}
         `}>
           <div className="flex items-center justify-between p-4 border-b lg:hidden">
             <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
@@ -190,18 +198,35 @@ const EmployeeDevelopment = () => {
             </button>
           </div>
           
+          {/* Collapse/Expand Button - Desktop Only */}
+          <div className="hidden lg:flex items-center justify-center p-2 border-b border-gray-200">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <ChevronLeft className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+          
           {/* Employee Info */}
           <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center mb-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'mb-4'}`}>
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <User className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="ml-3">
-                <h2 className="text-sm font-semibold text-gray-900">
-                  {employee?.firstName} {employee?.lastName}
-                </h2>
-                <p className="text-xs text-gray-600">{employee?.positionTitle}</p>
-              </div>
+              {!sidebarCollapsed && (
+                <div className="ml-3 min-w-0">
+                  <h2 className="text-sm font-semibold text-gray-900 truncate">
+                    {employee?.firstName} {employee?.lastName}
+                  </h2>
+                  <p className="text-xs text-gray-600 truncate">{employee?.positionTitle}</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -212,20 +237,34 @@ const EmployeeDevelopment = () => {
                 const Icon = item.icon;
                 return (
                   <li key={item.path}>
-                    <NavLink
-                      to={item.path}
-                      onClick={() => setSidebarOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center space-x-3 px-3 py-2 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                          isActive
-                            ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        }`
-                      }
-                    >
-                      <Icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </NavLink>
+                    <div className="relative group">
+                      <NavLink
+                        to={item.path}
+                        onClick={() => setSidebarOpen(false)}
+                        className={({ isActive }) =>
+                          `flex items-center rounded-lg transition-colors text-sm sm:text-base ${
+                            sidebarCollapsed 
+                              ? 'justify-center px-2 py-2 sm:py-3' 
+                              : 'space-x-3 px-3 py-2 sm:py-3'
+                          } ${
+                            isActive
+                              ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          }`
+                        }
+                      >
+                        <Icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      </NavLink>
+                      
+                      {/* Tooltip for collapsed sidebar */}
+                      {sidebarCollapsed && (
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                          {item.label}
+                          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-0 h-0 border-l-4 border-r-0 border-t-4 border-b-4 border-transparent border-r-gray-900"></div>
+                        </div>
+                      )}
+                    </div>
                   </li>
                 );
               })}
@@ -243,11 +282,16 @@ const EmployeeDevelopment = () => {
 
         {/* Main Content */}
         <main className="flex-1 overflow-hidden">
-          <div className="h-full p-3 sm:p-4 lg:p-6 xl:p-8 overflow-auto">
+          <div className={`h-full overflow-auto transition-all duration-300 ${
+            sidebarCollapsed ? 'p-3 sm:p-4 lg:p-6 xl:p-8' : 'p-3 sm:p-4 lg:p-6 xl:p-8'
+          }`}>
             <Routes>
               <Route path="profile" element={<EmployeeProfile employee={employee} />} />
               <Route path="assessment" element={<CompetencyAssessment employeeId={employeeId} />} />
               <Route path="dashboard" element={<CompetencyDashboard employeeId={employeeId} />} />
+              <Route path="development-plan" element={<DevelopmentPlan />} />
+              <Route path="career-navigator" element={<CareerNavigator employeeId={employeeId} />} />
+              <Route path="career-path" element={<CareerPath />} />
               <Route path="" element={<EmployeeProfile employee={employee} />} />
             </Routes>
           </div>

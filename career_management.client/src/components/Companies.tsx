@@ -10,6 +10,9 @@ interface Company {
     directorID?: number;
     isActive: boolean;
     createdDate: string;
+    modifiedDate?: string;
+    modifiedBy?: number;
+    modifiedByEmployeeName?: string;
     departmentCount: number;
     directorName?: string;
 }
@@ -45,6 +48,19 @@ const Companies = () => {
         fetchEmployees();
     }, []);
 
+    const getCurrentEmployeeId = (): number | null => {
+        try {
+            const currentEmployee = localStorage.getItem('currentEmployee');
+            if (currentEmployee) {
+                const employee = JSON.parse(currentEmployee);
+                return employee.employeeID || null;
+            }
+        } catch (error) {
+            console.error('Error parsing currentEmployee from localStorage:', error);
+        }
+        return null;
+    };
+
     const fetchCompanies = async () => {
         try {
             const response = await axios.get(getApiUrl('companies'));
@@ -68,7 +84,12 @@ const Companies = () => {
     const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to delete this company?')) {
             try {
-                await axios.delete(getApiUrl(`companies/${id}`));
+                const currentEmployeeId = getCurrentEmployeeId();
+                const url = currentEmployeeId 
+                    ? getApiUrl(`companies/${id}?modifiedBy=${currentEmployeeId}`)
+                    : getApiUrl(`companies/${id}`);
+                
+                await axios.delete(url);
                 fetchCompanies();
             } catch (error) {
                 console.error('Error deleting company:', error);
@@ -106,12 +127,14 @@ const Companies = () => {
 
         setSubmitting(true);
         try {
+            const currentEmployeeId = getCurrentEmployeeId();
             const companyData = {
                 companyName: formData.companyName.trim(),
                 description: formData.description.trim() || null,
                 directorID: formData.directorID.trim() ? parseInt(formData.directorID) : null,
                 isActive: true,
-                createdDate: new Date().toISOString()
+                createdDate: new Date().toISOString(),
+                modifiedBy: currentEmployeeId
             };
 
             if (editingCompany) {
@@ -263,16 +286,16 @@ const Companies = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50 sticky top-0 z-10">
                             <tr>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                     Company Name
                                 </th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                     Description
                                 </th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                     Director
                                 </th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                     Departments
                                 </th>
                                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
@@ -286,34 +309,34 @@ const Companies = () => {
                         <tbody className="bg-white divide-y divide-gray-200">
                             {filteredCompanies.map((company) => (
                                 <tr key={company.companyID} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">
                                         {company.companyName}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                    <td className="px-6 py-4 text-sm text-gray-900 text-left">
                                         {company.description || '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
                                         {company.directorName || '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
                                         {company.departmentCount} departments
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {new Date(company.createdDate).toLocaleDateString()}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div className="flex space-x-2">
+                                    <td className="px-2 py-4 whitespace-nowrap text-sm font-medium">
+                                        <div className="flex space-x-1">
                                             <button
                                                 onClick={() => handleEditCompany(company)}
-                                                className="text-blue-600 hover:text-blue-900"
+                                                className="text-blue-600 hover:text-blue-900 p-1"
                                             >
-                                                <Edit className="w-4 h-4" />
+                                                <Edit className="w-3 h-3" />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(company.companyID)}
-                                                className="text-red-600 hover:text-red-900"
+                                                className="text-red-600 hover:text-red-900 p-1"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <Trash2 className="w-3 h-3" />
                                             </button>
                                         </div>
                                     </td>

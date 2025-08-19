@@ -50,6 +50,19 @@ const CompetencyAssessment = ({ employeeId }: CompetencyAssessmentProps) => {
         fetchAssessments();
     }, [viewMode]);
 
+    const getCurrentEmployeeId = (): number | null => {
+        try {
+            const currentEmployee = localStorage.getItem('currentEmployee');
+            if (currentEmployee) {
+                const employee = JSON.parse(currentEmployee);
+                return employee.employeeID || null;
+            }
+        } catch (error) {
+            console.error('Error parsing currentEmployee from localStorage:', error);
+        }
+        return null;
+    };
+
     const fetchAssessments = async () => {
         if (!employeeId) return;
 
@@ -220,6 +233,7 @@ const CompetencyAssessment = ({ employeeId }: CompetencyAssessmentProps) => {
                         CompetencyID: parseInt(competencyId),
                         CurrentLevel: level,
                         Comments: '',
+                        ModifiedBy: getCurrentEmployeeId(), // Add ModifiedBy
                     }),
                 });
             });
@@ -442,13 +456,13 @@ const CompetencyAssessment = ({ employeeId }: CompetencyAssessmentProps) => {
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                     {index + 1}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-left text-gray-900">
                                                     {competency.domainName}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-left text-gray-900">
                                                     {competency.categoryName}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-left text-gray-900">
                                                     {competency.competencyName}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

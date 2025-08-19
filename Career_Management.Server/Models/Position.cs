@@ -28,14 +28,18 @@ namespace Career_Management.Server.Models
         
         public int? DepartmentID { get; set; }
         
-        [StringLength(20)]
-        public string? JobGrade { get; set; }
+        public int? JobGradeID { get; set; }
+        
+        [Required]
+        public int LeadershipID { get; set; } = 1;
         
         public bool IsActive { get; set; } = true;
         
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         
         public DateTime ModifiedDate { get; set; } = DateTime.Now;
+        
+        public int? ModifiedBy { get; set; }
         
         [StringLength(200)]
         public string? Department { get; set; }
@@ -47,6 +51,18 @@ namespace Career_Management.Server.Models
         [ForeignKey("DepartmentID")]
         [JsonIgnore]
         public virtual Department? DepartmentNavigation { get; set; }
+        
+        [ForeignKey("LeadershipID")]
+        [JsonIgnore]
+        public virtual LeadershipLevel? LeadershipLevel { get; set; }
+        
+        [ForeignKey("JobGradeID")]
+        [JsonIgnore]
+        public virtual JobGrade? JobGrade { get; set; }
+        
+        [ForeignKey("ModifiedBy")]
+        [JsonIgnore]
+        public virtual Employee? ModifiedByEmployee { get; set; }
         
         [JsonIgnore]
         public virtual ICollection<Employee> Employees { get; set; } = new List<Employee>();

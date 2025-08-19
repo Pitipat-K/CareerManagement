@@ -27,6 +27,8 @@ namespace Career_Management.Server.Controllers
                 .Where(e => e.IsActive)
                 .Include(e => e.Position)
                 .ThenInclude(p => p.DepartmentNavigation)
+                .Include(e => e.Manager)
+                .Include(e => e.ModifiedByEmployee) // Added
                 .ToListAsync();
 
             var employeeDtos = employees.Select(e => new EmployeeDto
@@ -36,6 +38,7 @@ namespace Career_Management.Server.Controllers
                 FirstName = e.FirstName,
                 LastName = e.LastName,
                 PositionID = e.PositionID,
+                ManagerID = e.ManagerID,
                 DateOfBirth = e.DateOfBirth,
                 Gender = e.Gender,
                 Phone = e.Phone,
@@ -43,10 +46,13 @@ namespace Career_Management.Server.Controllers
                 HireDate = e.HireDate,
                 CreatedDate = e.CreatedDate,
                 ModifiedDate = e.ModifiedDate,
+                ModifiedBy = e.ModifiedBy, // Added
+                ModifiedByEmployeeName = e.ModifiedByEmployee?.FullName, // Added
                 IsActive = e.IsActive,
                 FullName = e.FullName,
                 PositionTitle = e.Position?.PositionTitle ?? string.Empty,
-                DepartmentName = e.Position?.DepartmentNavigation?.DepartmentName
+                DepartmentName = e.Position?.DepartmentNavigation?.DepartmentName,
+                ManagerName = e.Manager?.FullName
             }).ToList();
 
             return employeeDtos;
@@ -59,6 +65,8 @@ namespace Career_Management.Server.Controllers
             var employee = await _context.Employees
                 .Include(e => e.Position)
                 .ThenInclude(p => p.DepartmentNavigation)
+                .Include(e => e.Manager)
+                .Include(e => e.ModifiedByEmployee) // Added
                 .FirstOrDefaultAsync(e => e.EmployeeID == id && e.IsActive);
 
             if (employee == null)
@@ -73,6 +81,7 @@ namespace Career_Management.Server.Controllers
                 FirstName = employee.FirstName,
                 LastName = employee.LastName,
                 PositionID = employee.PositionID,
+                ManagerID = employee.ManagerID,
                 DateOfBirth = employee.DateOfBirth,
                 Gender = employee.Gender,
                 Phone = employee.Phone,
@@ -80,10 +89,13 @@ namespace Career_Management.Server.Controllers
                 HireDate = employee.HireDate,
                 CreatedDate = employee.CreatedDate,
                 ModifiedDate = employee.ModifiedDate,
+                ModifiedBy = employee.ModifiedBy, // Added
+                ModifiedByEmployeeName = employee.ModifiedByEmployee?.FullName, // Added
                 IsActive = employee.IsActive,
                 FullName = employee.FullName,
                 PositionTitle = employee.Position?.PositionTitle ?? string.Empty,
-                DepartmentName = employee.Position?.DepartmentNavigation?.DepartmentName
+                DepartmentName = employee.Position?.DepartmentNavigation?.DepartmentName,
+                ManagerName = employee.Manager?.FullName
             };
 
             return employeeDto;
@@ -95,6 +107,7 @@ namespace Career_Management.Server.Controllers
         {
             employee.CreatedDate = DateTime.Now;
             employee.ModifiedDate = DateTime.Now;
+            employee.ModifiedBy = employee.ModifiedBy; // Added
             employee.IsActive = true;
             
             _context.Employees.Add(employee);
@@ -122,12 +135,14 @@ namespace Career_Management.Server.Controllers
             existingEmployee.FirstName = employee.FirstName;
             existingEmployee.LastName = employee.LastName;
             existingEmployee.PositionID = employee.PositionID;
+            existingEmployee.ManagerID = employee.ManagerID;
             existingEmployee.DateOfBirth = employee.DateOfBirth;
             existingEmployee.Gender = employee.Gender;
             existingEmployee.Phone = employee.Phone;
             existingEmployee.Email = employee.Email;
             existingEmployee.HireDate = employee.HireDate;
             existingEmployee.ModifiedDate = DateTime.Now;
+            existingEmployee.ModifiedBy = employee.ModifiedBy; // Added
 
             try
             {
@@ -150,7 +165,7 @@ namespace Career_Management.Server.Controllers
 
         // DELETE: api/Employees/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteEmployee(int id)
+        public async Task<IActionResult> DeleteEmployee(int id, [FromQuery] int? modifiedBy)
         {
             var employee = await _context.Employees.FindAsync(id);
             if (employee == null || !employee.IsActive)
@@ -159,6 +174,7 @@ namespace Career_Management.Server.Controllers
             }
 
             employee.IsActive = false;
+            employee.ModifiedBy = modifiedBy; // Added
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -180,6 +196,22 @@ namespace Career_Management.Server.Controllers
                 .ToListAsync();
 
             return Ok(positions);
+        }
+
+        // GET: api/Employees/managers
+        [HttpGet("managers")]
+        public async Task<ActionResult<IEnumerable<object>>> GetAvailableManagers()
+        {
+            var managers = await _context.Employees
+                .Where(e => e.IsActive)
+                .Select(e => new { e.EmployeeID, e.FirstName, e.LastName })
+                .OrderBy(e => e.FirstName)
+                .ThenBy(e => e.LastName)
+                .ToListAsync();
+
+            var result = managers.Select(m => new { m.EmployeeID, FullName = $"{m.FirstName} {m.LastName}" });
+
+            return Ok(result);
         }
 
         // POST: api/Employees/import
@@ -343,6 +375,19 @@ namespace Career_Management.Server.Controllers
                                     }
                                     // We'll resolve the PositionID later
                                     break;
+                                case "managerid":
+                                    if (!string.IsNullOrEmpty(cellValue))
+                                    {
+                                        if (int.TryParse(cellValue, out int managerId))
+                                        {
+                                            employee.ManagerID = managerId;
+                                        }
+                                        else
+                                        {
+                                            warnings.Add($"Row {row}: Invalid ManagerID format '{cellValue}', expected numeric value");
+                                        }
+                                    }
+                                    break;
                                 case "dateofbirth":
                                     if (!string.IsNullOrEmpty(cellValue))
                                     {
@@ -417,6 +462,18 @@ namespace Career_Management.Server.Controllers
                         }
 
                         employee.PositionID = position.PositionID;
+
+                        // Validate ManagerID if provided
+                        if (employee.ManagerID.HasValue)
+                        {
+                            var managerExists = await _context.Employees
+                                .AnyAsync(e => e.EmployeeID == employee.ManagerID.Value && e.IsActive);
+                            if (!managerExists)
+                            {
+                                warnings.Add($"Row {row}: ManagerID {employee.ManagerID.Value} does not exist, setting to null");
+                                employee.ManagerID = null;
+                            }
+                        }
 
                         // Check for duplicate EmployeeCode
                         if (!string.IsNullOrEmpty(employee.EmployeeCode))

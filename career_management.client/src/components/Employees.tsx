@@ -9,6 +9,7 @@ interface Employee {
   firstName: string;
   lastName: string;
   positionID: number;
+  managerID?: number;
   dateOfBirth?: string;
   gender?: string;
   phone?: string;
@@ -16,10 +17,13 @@ interface Employee {
   hireDate?: string;
   createdDate: string;
   modifiedDate: string;
+  modifiedBy?: number; // Added
+  modifiedByEmployeeName?: string; // Added
   isActive: boolean;
   fullName: string;
   positionTitle?: string;
   departmentName?: string;
+  managerName?: string;
 }
 
 interface Position {
@@ -27,11 +31,17 @@ interface Position {
   positionTitle: string;
 }
 
+interface Manager {
+  employeeID: number;
+  fullName: string;
+}
+
 interface EmployeeFormData {
   employeeCode: string;
   firstName: string;
   lastName: string;
   positionID: string;
+  managerID: string;
   dateOfBirth: string;
   gender: string;
   phone: string;
@@ -42,6 +52,7 @@ interface EmployeeFormData {
 const Employees = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+  const [managers, setManagers] = useState<Manager[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -52,6 +63,7 @@ const Employees = () => {
     firstName: '',
     lastName: '',
     positionID: '',
+    managerID: '',
     dateOfBirth: '',
     gender: '',
     phone: '',
@@ -60,14 +72,39 @@ const Employees = () => {
   });
   const [errors, setErrors] = useState<Partial<EmployeeFormData>>({});
 
+  // Helper function to get current employee ID from localStorage
+  const getCurrentEmployeeId = (): number | null => {
+    const currentEmployee = localStorage.getItem('currentEmployee');
+    return currentEmployee ? JSON.parse(currentEmployee).employeeID : null;
+  };
+
   useEffect(() => {
     fetchEmployees();
     fetchPositions();
+    fetchManagers();
   }, []);
+
+  // Refresh managers when modal opens for editing
+  useEffect(() => {
+    if (showModal && editingEmployee) {
+      fetchManagers();
+    }
+  }, [showModal, editingEmployee]);
+
+  // Update form data when managers are loaded and we're editing
+  useEffect(() => {
+    if (editingEmployee && managers.length > 0 && showModal) {
+      setFormData(prev => ({
+        ...prev,
+        managerID: editingEmployee.managerID?.toString() || ''
+      }));
+    }
+  }, [managers, editingEmployee, showModal]);
 
   const fetchEmployees = async () => {
     try {
       const response = await axios.get(getApiUrl('employees'));
+      console.log('Employees response:', response.data);
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -85,10 +122,24 @@ const Employees = () => {
     }
   };
 
+  const fetchManagers = async () => {
+    try {
+      const response = await axios.get(getApiUrl('employees/managers'));
+      console.log('Managers response:', response.data);
+      setManagers(response.data);
+    } catch (error) {
+      console.error('Error fetching managers:', error);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this employee?')) {
       try {
-        await axios.delete(getApiUrl(`employees/${id}`));
+        const currentEmployeeId = getCurrentEmployeeId();
+        const url = currentEmployeeId 
+          ? `${getApiUrl(`employees/${id}`)}?modifiedBy=${currentEmployeeId}`
+          : getApiUrl(`employees/${id}`);
+        await axios.delete(url);
         fetchEmployees();
       } catch (error) {
         console.error('Error deleting employee:', error);
@@ -149,11 +200,13 @@ const Employees = () => {
 
     setSubmitting(true);
     try {
+      const currentEmployeeId = getCurrentEmployeeId();
       const employeeData = {
         employeeCode: formData.employeeCode.trim() || null,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         positionID: parseInt(formData.positionID),
+        managerID: formData.managerID.trim() ? parseInt(formData.managerID) : null,
         dateOfBirth: formData.dateOfBirth.trim() || null,
         gender: formData.gender.trim() || null,
         phone: formData.phone.trim() || null,
@@ -161,7 +214,8 @@ const Employees = () => {
         hireDate: formData.hireDate.trim() || null,
         isActive: true,
         createdDate: new Date().toISOString(),
-        modifiedDate: new Date().toISOString()
+        modifiedDate: new Date().toISOString(),
+        modifiedBy: currentEmployeeId // Added
       };
 
       if (editingEmployee) {
@@ -182,6 +236,7 @@ const Employees = () => {
         firstName: '',
         lastName: '',
         positionID: '',
+        managerID: '',
         dateOfBirth: '',
         gender: '',
         phone: '',
@@ -218,6 +273,7 @@ const Employees = () => {
       firstName: '',
       lastName: '',
       positionID: '',
+      managerID: '',
       dateOfBirth: '',
       gender: '',
       phone: '',
@@ -227,19 +283,31 @@ const Employees = () => {
     setErrors({});
   };
 
-  const handleEditEmployee = (employee: Employee) => {
+  const handleEditEmployee = async (employee: Employee) => {
+    console.log('Editing employee:', employee);
+    console.log('Current managers:', managers);
+    console.log('Employee managerID:', employee.managerID);
+    
+    // Ensure managers are loaded
+    if (managers.length === 0) {
+      console.log('Managers not loaded, fetching...');
+      await fetchManagers();
+    }
+    
     setEditingEmployee(employee);
     setFormData({
       employeeCode: employee.employeeCode || '',
       firstName: employee.firstName,
       lastName: employee.lastName,
       positionID: employee.positionID.toString(),
+      managerID: employee.managerID?.toString() || '',
       dateOfBirth: employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('en-CA') : '',
       gender: employee.gender || '',
       phone: employee.phone || '',
       email: employee.email || '',
       hireDate: employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('en-CA') : ''
     });
+    console.log('Form data set with managerID:', employee.managerID?.toString() || '');
     setShowModal(true);
   };
 
@@ -320,6 +388,10 @@ const Employees = () => {
                   <p className="text-gray-900">{employee.departmentName || '-'}</p>
                 </div>
                 <div>
+                  <span className="font-medium text-gray-700">Manager:</span>
+                  <p className="text-gray-900">{employee.managerName || '-'}</p>
+                </div>
+                <div>
                   <span className="font-medium text-gray-700">Email:</span>
                   <p className="text-gray-900">{employee.email || '-'}</p>
                 </div>
@@ -342,19 +414,22 @@ const Employees = () => {
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 w-16">
                   No.
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Employee
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   ID
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Position
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Department
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                  Manager
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Contact
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
@@ -370,40 +445,43 @@ const Employees = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 text-left">
                         {employee.fullName}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 text-left">
                         {employee.gender} • {employee.dateOfBirth && new Date(employee.dateOfBirth).toLocaleDateString('en-CA')}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
                     {employee.employeeCode || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
                     {employee.positionTitle || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
                     {employee.departmentName || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{employee.email || '-'}</div>
-                    <div className="text-sm text-gray-500">{employee.phone || '-'}</div>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
+                    {employee.managerName || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900 text-left">{employee.email || '-'}</div>
+                    <div className="text-sm text-gray-500 text-left">{employee.phone || '-'}</div>
+                  </td>
+                  <td className="px-2 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-1">
                       <button
                         onClick={() => handleEditEmployee(employee)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="text-blue-600 hover:text-blue-900 p-1"
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => handleDelete(employee.employeeID)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-600 hover:text-red-900 p-1"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   </td>
@@ -521,6 +599,27 @@ const Employees = () => {
                 {errors.positionID && (
                   <p className="mt-1 text-sm text-red-600">{errors.positionID}</p>
                 )}
+              </div>
+
+              <div>
+                <label htmlFor="managerID" className="block text-sm font-medium text-gray-700 mb-1">
+                  Manager
+                </label>
+                <select
+                  id="managerID"
+                  value={formData.managerID}
+                  onChange={(e) => handleInputChange('managerID', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select a manager (optional)</option>
+                  {managers
+                    .filter(manager => !editingEmployee || manager.employeeID !== editingEmployee.employeeID)
+                    .map((manager) => (
+                      <option key={manager.employeeID} value={manager.employeeID}>
+                        {manager.fullName}
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

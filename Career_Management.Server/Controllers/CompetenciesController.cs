@@ -24,6 +24,7 @@ namespace Career_Management.Server.Controllers
             var competencies = await _context.Competencies
                 .Include(c => c.Category)
                 .ThenInclude(cat => cat!.Domain)
+                .Include(c => c.ModifiedByEmployee)
                 .Where(c => c.IsActive)
                 .OrderBy(c => c.DisplayOrder)
                 .ThenBy(c => c.CompetencyName)
@@ -36,7 +37,11 @@ namespace Career_Management.Server.Controllers
                     DisplayOrder = c.DisplayOrder,
                     IsActive = c.IsActive,
                     CategoryName = c.Category!.CategoryName,
-                    DomainName = c.Category.Domain!.DomainName
+                    DomainName = c.Category.Domain!.DomainName,
+                    CreatedDate = c.CreatedDate,
+                    ModifiedDate = c.ModifiedDate,
+                    ModifiedBy = c.ModifiedBy,
+                    ModifiedByEmployeeName = c.ModifiedByEmployee != null ? $"{c.ModifiedByEmployee.FirstName} {c.ModifiedByEmployee.LastName}" : null
                 })
                 .ToListAsync();
 
@@ -50,6 +55,7 @@ namespace Career_Management.Server.Controllers
             var competency = await _context.Competencies
                 .Include(c => c.Category)
                 .ThenInclude(cat => cat!.Domain)
+                .Include(c => c.ModifiedByEmployee)
                 .Where(c => c.CompetencyID == id && c.IsActive)
                 .Select(c => new CompetencyDto
                 {
@@ -60,7 +66,11 @@ namespace Career_Management.Server.Controllers
                     DisplayOrder = c.DisplayOrder,
                     IsActive = c.IsActive,
                     CategoryName = c.Category!.CategoryName,
-                    DomainName = c.Category.Domain!.DomainName
+                    DomainName = c.Category.Domain!.DomainName,
+                    CreatedDate = c.CreatedDate,
+                    ModifiedDate = c.ModifiedDate,
+                    ModifiedBy = c.ModifiedBy,
+                    ModifiedByEmployeeName = c.ModifiedByEmployee != null ? $"{c.ModifiedByEmployee.FirstName} {c.ModifiedByEmployee.LastName}" : null
                 })
                 .FirstOrDefaultAsync();
 
@@ -82,6 +92,8 @@ namespace Career_Management.Server.Controllers
             }
 
             competency.IsActive = true;
+            competency.CreatedDate = DateTime.Now;
+            competency.ModifiedDate = DateTime.Now;
             _context.Competencies.Add(competency);
             await _context.SaveChangesAsync();
 
@@ -92,7 +104,11 @@ namespace Career_Management.Server.Controllers
                 CompetencyName = competency.CompetencyName,
                 CompetencyDescription = competency.CompetencyDescription,
                 DisplayOrder = competency.DisplayOrder,
-                IsActive = competency.IsActive
+                IsActive = competency.IsActive,
+                CreatedDate = competency.CreatedDate,
+                ModifiedDate = competency.ModifiedDate,
+                ModifiedBy = competency.ModifiedBy,
+                ModifiedByEmployeeName = null // Will be populated when retrieved
             };
 
             return CreatedAtAction(nameof(GetCompetency), new { id = competency.CompetencyID }, competencyDto);
@@ -123,6 +139,8 @@ namespace Career_Management.Server.Controllers
             existingCompetency.CompetencyDescription = competency.CompetencyDescription;
             existingCompetency.DisplayOrder = competency.DisplayOrder;
             existingCompetency.IsActive = competency.IsActive;
+            existingCompetency.ModifiedDate = DateTime.Now;
+            existingCompetency.ModifiedBy = competency.ModifiedBy;
 
             try
             {
@@ -145,7 +163,7 @@ namespace Career_Management.Server.Controllers
 
         // DELETE: api/Competencies/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCompetency(int id)
+        public async Task<IActionResult> DeleteCompetency(int id, [FromQuery] int? modifiedBy)
         {
             var competency = await _context.Competencies.FindAsync(id);
             if (competency == null)
@@ -154,6 +172,8 @@ namespace Career_Management.Server.Controllers
             }
 
             competency.IsActive = false;
+            competency.ModifiedDate = DateTime.Now;
+            competency.ModifiedBy = modifiedBy;
             await _context.SaveChangesAsync();
 
             return NoContent();

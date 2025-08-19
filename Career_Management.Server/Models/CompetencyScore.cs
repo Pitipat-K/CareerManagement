@@ -23,6 +23,10 @@ namespace Career_Management.Server.Models
         
         public bool IsActive { get; set; } = true;
         
+        public DateTime CreatedDate { get; set; } = DateTime.Now;
+        public DateTime ModifiedDate { get; set; } = DateTime.Now;
+        public int? ModifiedBy { get; set; }
+        
         // Navigation properties
         [ForeignKey("AssessmentID")]
         [JsonIgnore]
@@ -31,5 +35,9 @@ namespace Career_Management.Server.Models
         [ForeignKey("CompetencyID")]
         [JsonIgnore]
         public virtual Competency? Competency { get; set; }
+        
+        [ForeignKey("ModifiedBy")]
+        [JsonIgnore]
+        public virtual Employee? ModifiedByEmployee { get; set; }
     }
 } 

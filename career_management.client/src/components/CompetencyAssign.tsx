@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Search, X, Copy, Clipboard, ChevronDown, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Clipboard, ChevronDown, Check } from 'lucide-react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
 
@@ -296,6 +296,26 @@ const CompetencyAssign = () => {
         }
     };
 
+    // Sort requirements by Domain, Category, and Competency Name
+    const sortedRequirements = requirements.sort((a, b) => {
+        // First sort by Domain
+        const domainA = a.domainName || '';
+        const domainB = b.domainName || '';
+        if (domainA !== domainB) {
+            return domainA.localeCompare(domainB);
+        }
+        
+        // Then sort by Category
+        const categoryA = a.categoryName || '';
+        const categoryB = b.categoryName || '';
+        if (categoryA !== categoryB) {
+            return categoryA.localeCompare(categoryB);
+        }
+        
+        // Finally sort by Competency Name
+        return (a.competencyName || '').localeCompare(b.competencyName || '');
+    });
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -326,7 +346,7 @@ const CompetencyAssign = () => {
             </div>
 
             {/* Main Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Positions List */}
                 <div className="lg:col-span-1">
                     <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -364,7 +384,7 @@ const CompetencyAssign = () => {
                 </div>
 
                 {/* Competency Requirements */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-3">
                     {selectedPosition ? (
                         <div className="bg-white rounded-lg shadow overflow-hidden">
                             <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
@@ -388,37 +408,53 @@ const CompetencyAssign = () => {
                             <div className="overflow-x-auto -mx-3 sm:mx-0">
                                 <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
                                     <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
+                                        <thead className="bg-gray-50 sticky top-0 z-10">
                                             <tr>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     No.
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                                                    Actions
+                                                </th>
+                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     Competency Name
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     Category
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     Domain
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     Required Level
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     Modified By
-                                                </th>
-                                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Actions
                                                 </th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
-                                            {requirements.map((requirement, index) => (
+                                            {sortedRequirements.map((requirement, index) => (
                                                 <tr key={requirement.requirementID} className="hover:bg-gray-50">
                                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                                         <div className="text-sm text-gray-900">
                                                             {index + 1}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                        <div className="flex items-center justify-end space-x-2">
+                                                            <button
+                                                                onClick={() => handleEditRequirement(requirement)}
+                                                                className="text-blue-600 hover:text-blue-900 p-1"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(requirement.requirementID)}
+                                                                className="text-red-600 hover:text-red-900 p-1"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-left">
@@ -447,29 +483,6 @@ const CompetencyAssign = () => {
                                                         </div>
                                                         <div className="text-xs text-gray-500 mt-1">
                                                             {requirement.modifiedDate ? new Date(requirement.modifiedDate).toLocaleString() : '-'}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <div className="flex items-center justify-end space-x-2">
-                                                            <button
-                                                                onClick={() => handleEditRequirement(requirement)}
-                                                                className="text-blue-600 hover:text-blue-900 p-1"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(requirement.requirementID)}
-                                                                className="text-red-600 hover:text-red-900 p-1"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                className="text-gray-400 hover:text-gray-600 p-1"
-                                                                title="Copy (Coming Soon)"
-                                                                disabled
-                                                            >
-                                                                <Copy className="w-4 h-4" />
-                                                            </button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -551,7 +564,7 @@ const CompetencyAssign = () => {
                                                         placeholder="Search competencies..."
                                                         value={competencySearchTerm}
                                                         onChange={(e) => setCompetencySearchTerm(e.target.value)}
-                                                        className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                                                        className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white placeholder:text-blue-500 text-gray-900"
                                                         autoFocus
                                                     />
                                                 </div>

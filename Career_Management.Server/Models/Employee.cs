@@ -23,6 +23,8 @@ namespace Career_Management.Server.Models
         [Required]
         public int PositionID { get; set; }
         
+        public int? ManagerID { get; set; }
+        
         public DateTime? DateOfBirth { get; set; }
         
         [StringLength(20)]
@@ -40,12 +42,25 @@ namespace Career_Management.Server.Models
         
         public DateTime ModifiedDate { get; set; } = DateTime.Now;
         
+        public int? ModifiedBy { get; set; }
+        
         public bool IsActive { get; set; } = true;
         
         // Navigation properties
         [ForeignKey("PositionID")]
         [JsonIgnore]
         public virtual Position? Position { get; set; }
+        
+        [ForeignKey("ManagerID")]
+        [JsonIgnore]
+        public virtual Employee? Manager { get; set; }
+        
+        [JsonIgnore]
+        public virtual ICollection<Employee>? Subordinates { get; set; }
+        
+        [ForeignKey("ModifiedBy")]
+        [JsonIgnore]
+        public virtual Employee? ModifiedByEmployee { get; set; }
         
         // Computed property for full name
         [NotMapped]

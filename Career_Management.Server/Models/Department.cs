@@ -23,6 +23,8 @@ namespace Career_Management.Server.Models
         public bool IsActive { get; set; } = true;
         
         public DateTime CreatedDate { get; set; } = DateTime.Now;
+        public DateTime ModifiedDate { get; set; } = DateTime.Now;
+        public int? ModifiedBy { get; set; }
         
         // Navigation properties
         [ForeignKey("CompanyID")]
@@ -31,5 +33,9 @@ namespace Career_Management.Server.Models
         
         [JsonIgnore]
         public virtual ICollection<Position> Positions { get; set; } = new List<Position>();
+        
+        [ForeignKey("ModifiedBy")]
+        [JsonIgnore]
+        public virtual Employee? ModifiedByEmployee { get; set; }
     }
 } 

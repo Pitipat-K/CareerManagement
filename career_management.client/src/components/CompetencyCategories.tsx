@@ -11,6 +11,10 @@ interface CompetencyCategory {
     displayOrder?: number;
     isActive: boolean;
     domainName?: string;
+    createdDate?: string;
+    modifiedDate?: string;
+    modifiedBy?: number;
+    modifiedByEmployeeName?: string;
 }
 
 interface CompetencyDomain {
@@ -46,6 +50,19 @@ const CompetencyCategories = () => {
         fetchDomains();
     }, []);
 
+    const getCurrentEmployeeId = (): number | null => {
+        try {
+            const currentEmployee = localStorage.getItem('currentEmployee');
+            if (currentEmployee) {
+                const employee = JSON.parse(currentEmployee);
+                return employee.employeeID || null;
+            }
+        } catch (error) {
+            console.error('Error parsing currentEmployee from localStorage:', error);
+        }
+        return null;
+    };
+
     const fetchCategories = async () => {
         try {
             const response = await axios.get(getApiUrl('competencycategories'));
@@ -69,7 +86,12 @@ const CompetencyCategories = () => {
     const handleDelete = async (id: number) => {
         if (window.confirm('Are you sure you want to delete this category?')) {
             try {
-                await axios.delete(getApiUrl(`competencycategories/${id}`));
+                const currentEmployeeId = getCurrentEmployeeId();
+                const url = currentEmployeeId 
+                    ? getApiUrl(`competencycategories/${id}?modifiedBy=${currentEmployeeId}`)
+                    : getApiUrl(`competencycategories/${id}`);
+                
+                await axios.delete(url);
                 fetchCategories();
             } catch (error) {
                 console.error('Error deleting category:', error);
@@ -112,12 +134,14 @@ const CompetencyCategories = () => {
 
         setSubmitting(true);
         try {
+            const currentEmployeeId = getCurrentEmployeeId();
             const categoryData = {
                 domainID: parseInt(formData.domainID),
                 categoryName: formData.categoryName.trim(),
                 categoryDescription: formData.categoryDescription.trim() || null,
                 displayOrder: formData.displayOrder.trim() ? parseInt(formData.displayOrder) : null,
-                isActive: true
+                isActive: true,
+                modifiedBy: currentEmployeeId
             };
 
             if (editingCategory) {
@@ -246,16 +270,16 @@ const CompetencyCategories = () => {
                                     <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         No.
                                     </th>
-                                    <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Category Name
                                     </th>
-                                    <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Domain
                                     </th>
-                                    <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Description
                                     </th>
-                                    <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Actions
                                     </th>
                                 </tr>
@@ -263,39 +287,39 @@ const CompetencyCategories = () => {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {filteredCategories.map((category, index) => (
                                     <tr key={category.categoryID} className="hover:bg-gray-50">
-                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">
+                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
+                                            <div className="text-sm text-gray-900 text-center">
                                                 {index + 1}
                                             </div>
                                         </td>
                                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">
+                                            <div className="text-sm font-medium text-gray-900 text-left">
                                                 {category.categoryName}
                                             </div>
                                         </td>
                                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">
+                                            <div className="text-sm text-gray-900 text-left">
                                                 {category.domainName}
                                             </div>
                                         </td>
                                         <td className="px-3 sm:px-6 py-4">
-                                            <div className="text-sm text-gray-900 max-w-xs truncate">
+                                            <div className="text-sm text-gray-900 max-w-xs truncate text-left">
                                                 {category.categoryDescription || '-'}
                                             </div>
                                         </td>
-                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex items-center justify-end space-x-2">
+                                        <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                            <div className="flex items-center justify-center space-x-1">
                                                 <button
                                                     onClick={() => handleEditCategory(category)}
                                                     className="text-blue-600 hover:text-blue-900 p-1"
                                                 >
-                                                    <Edit className="w-4 h-4" />
+                                                    <Edit className="w-3 h-3" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(category.categoryID)}
                                                     className="text-red-600 hover:text-red-900 p-1"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <Trash2 className="w-3 h-3" />
                                                 </button>
                                             </div>
                                         </td>
