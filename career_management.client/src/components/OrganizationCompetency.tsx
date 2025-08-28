@@ -288,44 +288,83 @@ const OrganizationCompetency = () => {
     count: filteredEmployees.filter(emp => emp.jobGrade === grade.jobGradeName).length
   }));
 
-     // Calculate competency achievement percentages by domain using the view data
-   const calculateCompetencyAchievementByDomain = () => {
-     const domainAchievement: { domainName: string; percentage: number; assignedCount: number; achievedCount: number }[] = [];
+           // Calculate competency achievement percentages by domain based on filtered employees
+    const calculateCompetencyAchievementByDomain = () => {
+      const domainAchievement: { domainName: string; percentage: number; assignedCount: number; achievedCount: number }[] = [];
 
-     // Group competency progress data by domain
-     const domainProgress = competencyProgress.reduce((acc, item) => {
-       if (!acc[item.domain]) {
-         acc[item.domain] = {
-           domainName: item.domain,
-           totalAssigned: 0,
-           totalAchieved: 0
-         };
-       }
-       acc[item.domain].totalAssigned += item.assigned;
-       acc[item.domain].totalAchieved += item.achieved;
-       return acc;
-     }, {} as Record<string, { domainName: string; totalAssigned: number; totalAchieved: number }>);
+      // Get unique domains from competency data
+      const uniqueDomains = [...new Set(competencies.map(c => c.domainName))].filter((domainName): domainName is string => Boolean(domainName));
 
-     // Convert to array and calculate percentages
-     Object.values(domainProgress).forEach(domain => {
-       const percentage = domain.totalAssigned > 0 ? (domain.totalAchieved / domain.totalAssigned) * 100 : 0;
-       
-       domainAchievement.push({
-         domainName: domain.domainName,
-         percentage: Math.round(percentage * 10) / 10, // Round to 1 decimal place
-         assignedCount: domain.totalAssigned,
-         achievedCount: domain.totalAchieved
-       });
-     });
+      uniqueDomains.forEach(domainName => {
+        let totalAssigned = 0;
+        let totalAchieved = 0;
 
-     return domainAchievement.sort((a, b) => b.percentage - a.percentage);
-   };
+        // For each filtered employee, calculate their competency achievement in this domain
+        filteredEmployees.forEach(employee => {
+          // Get competencies required for this employee's position in this domain
+          const employeePositionRequirements = positionRequirements.filter(req => 
+            req.positionID === employee.positionID
+          );
+
+          // Get competencies in this domain
+          const domainCompetencies = competencies.filter(comp => 
+            comp.domainName === domainName
+          );
+
+          // Count assigned competencies (those required for the position)
+          const assignedCompetencies = employeePositionRequirements.filter(req => 
+            domainCompetencies.some(comp => comp.competencyID === req.competencyID)
+          );
+          totalAssigned += assignedCompetencies.length;
+
+          // Count achieved competencies (those with assessment scores)
+          if (assignedCompetencies.length > 0) {
+            // Get assessments for this employee
+            const employeeAssessments = assessments.filter(assessment => 
+              assessment.employeeID === employee.employeeID && 
+              assessment.status === 'Completed'
+            );
+
+            // Get the latest assessment
+            const latestAssessment = employeeAssessments.sort((a, b) => 
+              new Date(b.assessmentDate).getTime() - new Date(a.assessmentDate).getTime()
+            )[0];
+
+            if (latestAssessment) {
+              // Get competency scores for this assessment
+              const assessmentScores = competencyScores.filter(score => 
+                score.assessmentID === latestAssessment.assessmentID
+              );
+
+              // Count achieved competencies (those with scores >= required level)
+              assignedCompetencies.forEach(requirement => {
+                const score = assessmentScores.find(s => s.competencyID === requirement.competencyID);
+                if (score && score.currentLevel >= requirement.requiredLevel) {
+                  totalAchieved++;
+                }
+              });
+            }
+          }
+        });
+
+        // Calculate percentage
+        const percentage = totalAssigned > 0 ? (totalAchieved / totalAssigned) * 100 : 0;
+        
+        domainAchievement.push({
+          domainName: domainName,
+          percentage: Math.round(percentage * 10) / 10, // Round to 1 decimal place
+          assignedCount: totalAssigned,
+          achievedCount: totalAchieved
+        });
+      });
+
+      return domainAchievement.sort((a, b) => b.percentage - a.percentage);
+    };
 
   const domainAchievementData = calculateCompetencyAchievementByDomain();
 
-     // Debug: Log competency progress data from the view
-   console.log('Competency progress data from view:', competencyProgress.slice(0, 5));
-   console.log('Domain achievement calculated:', domainAchievementData);
+           // Debug: Log domain achievement calculation
+    console.log('Domain achievement calculated:', domainAchievementData);
 
   if (loading) {
     return (
@@ -808,17 +847,14 @@ const OrganizationCompetency = () => {
                     ))}
                   </div>
                 </div>
-              ) : competencyProgress.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">No competency progress data available</p>
-                  <p className="text-xs text-gray-400">
-                    The competency progress view may not have data yet.
-                  </p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Please ensure the vw_CompetencyProgress view is created and populated.
-                  </p>
-                </div>
+                             ) : competencies.length === 0 ? (
+                 <div className="text-center py-8 text-gray-500">
+                   <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                   <p className="text-sm">No competency data available</p>
+                   <p className="text-xs text-gray-400">
+                     No competencies are configured in the system.
+                   </p>
+                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
