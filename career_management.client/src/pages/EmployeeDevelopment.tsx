@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link } from 'react-router-dom';
-import { User, ClipboardList, ArrowLeft, Menu, X, LogOut, PieChart, TrendingUp, Map, ChevronLeft, ChevronRight } from 'lucide-react';
+import { User, ClipboardList, ArrowLeft, Menu, X, LogOut, PieChart, TrendingUp, Map, ChevronLeft, ChevronRight, Building } from 'lucide-react';
 import EmployeeProfile from '../components/EmployeeProfile';
 import CompetencyAssessment from '../components/CompetencyAssessment';
 import CompetencyDashboard from '../components/CompetencyDashboard';
 import DevelopmentPlan from '../components/DevelopmentPlan';
 import CareerNavigator from '../components/CareerNavigator';
 import CareerPath from '../components/CareerPath';
+import OrganizationCompetency from '../components/OrganizationCompetency';
 import { getApiUrl } from '../config/api';
 
 interface Employee {
@@ -50,6 +51,7 @@ const EmployeeDevelopment = () => {
     { path: 'development-plan', label: 'Development Plan', icon: ClipboardList },
     { path: 'career-navigator', label: 'Career Navigator', icon: TrendingUp },
     { path: 'career-path', label: 'Career Path', icon: Map },
+    { path: 'organization-competency', label: 'Organization Competency', icon: Building },
   ];
 
   useEffect(() => {
@@ -292,6 +294,7 @@ const EmployeeDevelopment = () => {
               <Route path="development-plan" element={<DevelopmentPlan />} />
               <Route path="career-navigator" element={<CareerNavigator employeeId={employeeId} />} />
               <Route path="career-path" element={<CareerPath />} />
+              <Route path="organization-competency" element={<OrganizationCompetency />} />
               <Route path="" element={<EmployeeProfile employee={employee} />} />
             </Routes>
           </div>

@@ -16,8 +16,8 @@ interface Position {
   positionTitle: string;
   positionDescription?: string;
   experienceRequirement?: number;
-  jobGroup?: string;
-  jobFunction?: string;
+  jobFunctionID?: number;
+  jobFunctionName?: string;
   jobGradeID?: number;
   jobGradeName?: string;
   departmentID?: number;
@@ -41,12 +41,17 @@ interface LeadershipLevel {
   levelName: string;
 }
 
+interface JobFunction {
+  jobFunctionID: number;
+  jobFunctionName: string;
+  jobFunctionDescription?: string;
+}
+
 interface PositionFormData {
   positionTitle: string;
   positionDescription: string;
   experienceRequirement: string;
-  jobGroup: string;
-  jobFunction: string;
+  jobFunctionID: string;
   jobGradeID: string;
   departmentID: string;
   leadershipID: string;
@@ -57,6 +62,7 @@ const Positions = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [leadershipLevels, setLeadershipLevels] = useState<LeadershipLevel[]>([]);
   const [jobGrades, setJobGrades] = useState<JobGrade[]>([]);
+  const [jobFunctions, setJobFunctions] = useState<JobFunction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -66,8 +72,7 @@ const Positions = () => {
     positionTitle: '',
     positionDescription: '',
     experienceRequirement: '',
-    jobGroup: '',
-    jobFunction: '',
+    jobFunctionID: '',
     jobGradeID: '',
     departmentID: '',
     leadershipID: ''
@@ -85,6 +90,7 @@ const Positions = () => {
     fetchDepartments();
     fetchLeadershipLevels();
     fetchJobGrades();
+    fetchJobFunctions();
   }, []);
 
   const fetchPositions = async () => {
@@ -125,6 +131,15 @@ const Positions = () => {
     }
   };
 
+  const fetchJobFunctions = async () => {
+    try {
+      const response = await axios.get(getApiUrl('jobfunctions'));
+      setJobFunctions(response.data);
+    } catch (error) {
+      console.error('Error fetching job functions:', error);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this position?')) {
       try {
@@ -156,16 +171,12 @@ const Positions = () => {
       newErrors.positionDescription = 'Position description must be 1000 characters or less';
     }
 
-    if (formData.experienceRequirement.trim() && isNaN(Number(formData.experienceRequirement))) {
-      newErrors.experienceRequirement = 'Experience requirement must be a valid number';
+    if (formData.experienceRequirement && (parseInt(formData.experienceRequirement) < 0)) {
+      newErrors.experienceRequirement = 'Experience requirement must be a positive number';
     }
 
-    if (formData.jobGroup.trim().length > 100) {
-      newErrors.jobGroup = 'Job group must be 100 characters or less';
-    }
-
-    if (formData.jobFunction.trim().length > 200) {
-      newErrors.jobFunction = 'Job function must be 200 characters or less';
+    if (formData.jobFunctionID.trim() && isNaN(Number(formData.jobFunctionID))) {
+      newErrors.jobFunctionID = 'Job function must be a valid selection';
     }
 
     if (formData.jobGradeID.trim() && isNaN(Number(formData.jobGradeID))) {
@@ -204,15 +215,11 @@ const Positions = () => {
       const positionData = {
         positionTitle: formData.positionTitle.trim(),
         positionDescription: formData.positionDescription.trim() || null,
-        experienceRequirement: formData.experienceRequirement.trim() ? parseInt(formData.experienceRequirement) : null,
-        jobGroup: formData.jobGroup.trim() || null,
-        jobFunction: formData.jobFunction.trim() || null,
-        jobGradeID: formData.jobGradeID.trim() ? parseInt(formData.jobGradeID) : null,
-        departmentID: formData.departmentID.trim() ? parseInt(formData.departmentID) : null,
-        leadershipID: formData.leadershipID.trim() ? parseInt(formData.leadershipID) : 1,
-        isActive: true,
-        createdDate: new Date().toISOString(),
-        modifiedDate: new Date().toISOString(),
+        experienceRequirement: formData.experienceRequirement ? parseInt(formData.experienceRequirement) : null,
+        jobFunctionID: formData.jobFunctionID ? parseInt(formData.jobFunctionID) : null,
+        jobGradeID: formData.jobGradeID ? parseInt(formData.jobGradeID) : null,
+        departmentID: formData.departmentID ? parseInt(formData.departmentID) : null,
+        leadershipID: parseInt(formData.leadershipID),
         modifiedBy: currentEmployeeId
       };
 
@@ -233,8 +240,7 @@ const Positions = () => {
         positionTitle: '',
         positionDescription: '',
         experienceRequirement: '',
-        jobGroup: '',
-        jobFunction: '',
+        jobFunctionID: '',
         jobGradeID: '',
         departmentID: '',
         leadershipID: ''
@@ -268,8 +274,7 @@ const Positions = () => {
       positionTitle: '',
       positionDescription: '',
       experienceRequirement: '',
-      jobGroup: '',
-      jobFunction: '',
+      jobFunctionID: '',
       jobGradeID: '',
       departmentID: '',
       leadershipID: ''
@@ -283,8 +288,7 @@ const Positions = () => {
       positionTitle: position.positionTitle,
       positionDescription: position.positionDescription || '',
       experienceRequirement: position.experienceRequirement?.toString() || '',
-      jobGroup: position.jobGroup || '',
-      jobFunction: position.jobFunction || '',
+      jobFunctionID: position.jobFunctionID?.toString() || '',
       jobGradeID: position.jobGradeID?.toString() || '',
       departmentID: position.departmentID?.toString() || '',
       leadershipID: position.leadershipID?.toString() || ''
@@ -294,8 +298,7 @@ const Positions = () => {
 
   const filteredPositions = positions.filter(position =>
     position.positionTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    position.jobGroup?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    position.jobFunction?.toLowerCase().includes(searchTerm.toLowerCase())
+    position.jobFunctionName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -362,8 +365,8 @@ const Positions = () => {
                   <p className="text-gray-900">{position.departmentName || '-'}</p>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">Job Group:</span>
-                  <p className="text-gray-900">{position.jobGroup || '-'}</p>
+                  <span className="font-medium text-gray-700">Job Function:</span>
+                  <p className="text-gray-900">{position.jobFunctionName || '-'}</p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">Job Grade:</span>
@@ -399,7 +402,7 @@ const Positions = () => {
                   Department
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                  Job Group
+                  Job Function
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Job Grade
@@ -432,7 +435,7 @@ const Positions = () => {
                     {position.departmentName || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left">
-                    {position.jobGroup || '-'}
+                    {position.jobFunctionName || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {position.jobGradeName || '-'}
@@ -576,42 +579,26 @@ const Positions = () => {
               </div>
 
               <div>
-                <label htmlFor="jobGroup" className="block text-sm font-medium text-gray-700 mb-1">
-                  Job Group
-                </label>
-                <input
-                  type="text"
-                  id="jobGroup"
-                  value={formData.jobGroup}
-                  onChange={(e) => handleInputChange('jobGroup', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.jobGroup ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Enter job group"
-                  maxLength={100}
-                />
-                {errors.jobGroup && (
-                  <p className="mt-1 text-sm text-red-600">{errors.jobGroup}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="jobFunction" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="jobFunctionID" className="block text-sm font-medium text-gray-700 mb-1">
                   Job Function
                 </label>
-                <input
-                  type="text"
-                  id="jobFunction"
-                  value={formData.jobFunction}
-                  onChange={(e) => handleInputChange('jobFunction', e.target.value)}
+                <select
+                  id="jobFunctionID"
+                  value={formData.jobFunctionID}
+                  onChange={(e) => handleInputChange('jobFunctionID', e.target.value)}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.jobFunction ? 'border-red-500' : 'border-gray-300'
+                    errors.jobFunctionID ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="Enter job function"
-                  maxLength={200}
-                />
-                {errors.jobFunction && (
-                  <p className="mt-1 text-sm text-red-600">{errors.jobFunction}</p>
+                >
+                  <option value="">Select a job function</option>
+                  {jobFunctions.map((jobFunction) => (
+                    <option key={jobFunction.jobFunctionID} value={jobFunction.jobFunctionID}>
+                      {jobFunction.jobFunctionName}
+                    </option>
+                  ))}
+                </select>
+                {errors.jobFunctionID && (
+                  <p className="mt-1 text-sm text-red-600">{errors.jobFunctionID}</p>
                 )}
               </div>
 

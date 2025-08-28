@@ -71,7 +71,7 @@ const Home = () => {
                   <Briefcase className="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 mb-3 sm:mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-200" />
                   <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2">Competency Management</h3>
                   <p className="text-green-100 text-xs sm:text-sm lg:text-base">
-                    Assess and track employee competencies
+                    Manage employee competencies
                   </p>
                 </div>
               </Link>
@@ -79,9 +79,9 @@ const Home = () => {
               <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-lg p-4 sm:p-6 lg:p-8 opacity-60">
                 <div className="flex flex-col items-center text-center">
                   <MapPin className="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 mb-3 sm:mb-4 lg:mb-6 text-gray-400" />
-                  <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2 text-gray-600">Career Planning</h3>
+                  <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2 text-gray-600">Analytics & Reporting</h3>
                   <p className="text-gray-500 text-xs sm:text-sm lg:text-base">
-                    Plan career paths and succession
+                    Generate insights and reports
                   </p>
                 </div>
               </div>

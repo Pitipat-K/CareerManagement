@@ -209,9 +209,13 @@ const CompetencyAssessment = ({ employeeId }: CompetencyAssessmentProps) => {
 
         // Check if all competencies have levels selected
         const allCompetencies = currentAssessment.competencies;
-        const missingLevels = allCompetencies.filter(competency =>
-            !tempLevels[competency.competencyID] && !competency.selfLevel
-        );
+        const missingLevels = allCompetencies.filter(competency => {
+            const hasTempLevel = tempLevels[competency.competencyID] !== undefined;
+            const hasExistingLevel = viewMode === 'team' 
+                ? competency.managerLevel !== undefined 
+                : competency.selfLevel !== undefined;
+            return !hasTempLevel && !hasExistingLevel;
+        });
 
         if (missingLevels.length > 0) {
             alert(`Please select levels for all competencies. Missing levels for ${missingLevels.length} competency(ies).`);
@@ -485,9 +489,19 @@ const CompetencyAssessment = ({ employeeId }: CompetencyAssessmentProps) => {
                                                                     : (competency.selfLevel !== undefined ? competency.selfLevel : '')
                                                             }
                                                             onChange={(e) => {
-                                                                const level = parseInt(e.target.value);
-                                                                if (!isNaN(level)) {
-                                                                    handleTempLevelChange(competency.competencyID, level);
+                                                                const value = e.target.value;
+                                                                if (value === '') {
+                                                                    // Remove from tempLevels when no level is selected
+                                                                    setTempLevels(prev => {
+                                                                        const newLevels = { ...prev };
+                                                                        delete newLevels[competency.competencyID];
+                                                                        return newLevels;
+                                                                    });
+                                                                } else {
+                                                                    const level = parseInt(value);
+                                                                    if (!isNaN(level)) {
+                                                                        handleTempLevelChange(competency.competencyID, level);
+                                                                    }
                                                                 }
                                                             }}
                                                             className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -502,13 +516,13 @@ const CompetencyAssessment = ({ employeeId }: CompetencyAssessmentProps) => {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                    {(tempLevels[competency.competencyID] || competency.selfLevel) ? (
-                                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${(tempLevels[competency.competencyID] || competency.selfLevel || 0) >= competency.requiredLevel
+                                                    {(tempLevels[competency.competencyID] !== undefined || competency.selfLevel !== undefined) ? (
+                                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${(tempLevels[competency.competencyID] !== undefined ? tempLevels[competency.competencyID] : (competency.selfLevel !== undefined ? competency.selfLevel : 0)) >= competency.requiredLevel
                                                                 ? 'bg-green-100 text-green-800'
                                                                 : 'bg-red-100 text-red-800'
                                                             }`}>
-                                                            {(tempLevels[competency.competencyID] || competency.selfLevel || 0) - competency.requiredLevel > 0 ? '+' : ''}
-                                                            {(tempLevels[competency.competencyID] || competency.selfLevel || 0) - competency.requiredLevel}
+                                                            {(tempLevels[competency.competencyID] !== undefined ? tempLevels[competency.competencyID] : (competency.selfLevel !== undefined ? competency.selfLevel : 0)) - competency.requiredLevel > 0 ? '+' : ''}
+                                                            {(tempLevels[competency.competencyID] !== undefined ? tempLevels[competency.competencyID] : (competency.selfLevel !== undefined ? competency.selfLevel : 0)) - competency.requiredLevel}
                                                         </span>
                                                     ) : (
                                                         <span className="text-gray-400">-</span>
@@ -523,9 +537,19 @@ const CompetencyAssessment = ({ employeeId }: CompetencyAssessmentProps) => {
                                                                     : (competency.managerLevel !== undefined ? competency.managerLevel : '')
                                                             }
                                                             onChange={(e) => {
-                                                                const level = parseInt(e.target.value);
-                                                                if (!isNaN(level)) {
-                                                                    handleTempLevelChange(competency.competencyID, level);
+                                                                const value = e.target.value;
+                                                                if (value === '') {
+                                                                    // Remove from tempLevels when no level is selected
+                                                                    setTempLevels(prev => {
+                                                                        const newLevels = { ...prev };
+                                                                        delete newLevels[competency.competencyID];
+                                                                        return newLevels;
+                                                                    });
+                                                                } else {
+                                                                    const level = parseInt(value);
+                                                                    if (!isNaN(level)) {
+                                                                        handleTempLevelChange(competency.competencyID, level);
+                                                                    }
                                                                 }
                                                             }}
                                                             className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"

@@ -17,6 +17,39 @@ namespace Career_Management.Server.Controllers
             _context = context;
         }
 
+        // GET: api/PositionCompetencyRequirements
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<PositionCompetencyRequirementDto>>> GetPositionCompetencyRequirements()
+        {
+            var requirements = await _context.PositionCompetencyRequirements
+                .Include(r => r.Competency)
+                .ThenInclude(c => c!.Category)
+                .ThenInclude(cat => cat!.Domain)
+                .Include(r => r.ModifiedByEmployee)
+                .Where(r => r.IsActive)
+                .Select(r => new PositionCompetencyRequirementDto
+                {
+                    RequirementID = r.RequirementID,
+                    PositionID = r.PositionID,
+                    CompetencyID = r.CompetencyID,
+                    RequiredLevel = r.RequiredLevel,
+                    IsMandatory = r.IsMandatory,
+                    CreatedDate = r.CreatedDate ?? DateTime.Now,
+                    ModifiedDate = r.ModifiedDate ?? DateTime.Now,
+                    ModifiedBy = r.ModifiedBy,
+                    IsActive = r.IsActive,
+                    CompetencyName = r.Competency!.CompetencyName,
+                    CategoryName = r.Competency.Category!.CategoryName,
+                    DomainName = r.Competency.Category.Domain!.DomainName,
+                    ModifiedByEmployeeName = r.ModifiedByEmployee != null ? $"{r.ModifiedByEmployee.FirstName} {r.ModifiedByEmployee.LastName}".Trim() : null
+                })
+                .OrderBy(r => r.PositionID)
+                .ThenBy(r => r.CompetencyName)
+                .ToListAsync();
+
+            return Ok(requirements);
+        }
+
         // GET: api/PositionCompetencyRequirements/positions
         [HttpGet("positions")]
         public async Task<ActionResult<IEnumerable<PositionWithCompetencyCountDto>>> GetPositionsWithCompetencyCount()

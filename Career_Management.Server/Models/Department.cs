@@ -34,6 +34,9 @@ namespace Career_Management.Server.Models
         [JsonIgnore]
         public virtual ICollection<Position> Positions { get; set; } = new List<Position>();
         
+        [JsonIgnore]
+        public virtual ICollection<JobFunction> JobFunctions { get; set; } = new List<JobFunction>();
+        
         [ForeignKey("ModifiedBy")]
         [JsonIgnore]
         public virtual Employee? ModifiedByEmployee { get; set; }

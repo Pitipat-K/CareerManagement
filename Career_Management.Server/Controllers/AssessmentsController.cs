@@ -24,6 +24,36 @@ namespace Career_Management.Server.Controllers
             _notificationService = notificationService;
         }
 
+        // GET: api/Assessments
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<AssessmentDto>>> GetAssessments()
+        {
+            var assessments = await _context.Assessments
+                .Where(a => a.IsActive)
+                .Include(a => a.Employee)
+                .Include(a => a.Assessor)
+                .Include(a => a.CreatedByEmployee)
+                .OrderByDescending(a => a.AssessmentDate)
+                .Select(a => new AssessmentDto
+                {
+                    AssessmentID = a.AssessmentID,
+                    EmployeeID = a.EmployeeID,
+                    AssessorID = a.AssessorID,
+                    AssessmentDate = a.AssessmentDate,
+                    AssessmentPeriod = a.AssessmentPeriod,
+                    Status = a.Status,
+                    CreatedBy = a.CreatedBy,
+                    IsActive = a.IsActive,
+                    EmployeeName = a.Employee != null ? a.Employee.FullName : null,
+                    AssessorName = a.Assessor != null ? a.Assessor.FullName : null,
+                    CreatedByName = a.CreatedByEmployee != null ? a.CreatedByEmployee.FullName : null,
+                    AssessmentType = a.AssessmentType
+                })
+                .ToListAsync();
+
+            return Ok(assessments);
+        }
+
         // GET: api/Assessments/employee/{employeeId}
         [HttpGet("employee/{employeeId}")]
         public async Task<ActionResult<IEnumerable<AssessmentDto>>> GetEmployeeAssessments(int employeeId)

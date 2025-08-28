@@ -27,6 +27,10 @@ namespace Career_Management.Server.Controllers
                 .Where(e => e.IsActive)
                 .Include(e => e.Position)
                 .ThenInclude(p => p.DepartmentNavigation)
+                .Include(e => e.Position)
+                .ThenInclude(p => p.JobFunction)
+                .Include(e => e.Position)
+                .ThenInclude(p => p.JobGrade)
                 .Include(e => e.Manager)
                 .Include(e => e.ModifiedByEmployee) // Added
                 .ToListAsync();
@@ -44,6 +48,7 @@ namespace Career_Management.Server.Controllers
                 Phone = e.Phone,
                 Email = e.Email,
                 HireDate = e.HireDate,
+                WorkerCategory = e.WorkerCategory,
                 CreatedDate = e.CreatedDate,
                 ModifiedDate = e.ModifiedDate,
                 ModifiedBy = e.ModifiedBy, // Added
@@ -52,6 +57,8 @@ namespace Career_Management.Server.Controllers
                 FullName = e.FullName,
                 PositionTitle = e.Position?.PositionTitle ?? string.Empty,
                 DepartmentName = e.Position?.DepartmentNavigation?.DepartmentName,
+                JobFunctionName = e.Position?.JobFunction?.JobFunctionName,
+                JobGrade = e.Position?.JobGrade?.JobGradeName,
                 ManagerName = e.Manager?.FullName
             }).ToList();
 
@@ -65,6 +72,10 @@ namespace Career_Management.Server.Controllers
             var employee = await _context.Employees
                 .Include(e => e.Position)
                 .ThenInclude(p => p.DepartmentNavigation)
+                .Include(e => e.Position)
+                .ThenInclude(p => p.JobFunction)
+                .Include(e => e.Position)
+                .ThenInclude(p => p.JobGrade)
                 .Include(e => e.Manager)
                 .Include(e => e.ModifiedByEmployee) // Added
                 .FirstOrDefaultAsync(e => e.EmployeeID == id && e.IsActive);
@@ -87,6 +98,7 @@ namespace Career_Management.Server.Controllers
                 Phone = employee.Phone,
                 Email = employee.Email,
                 HireDate = employee.HireDate,
+                WorkerCategory = employee.WorkerCategory,
                 CreatedDate = employee.CreatedDate,
                 ModifiedDate = employee.ModifiedDate,
                 ModifiedBy = employee.ModifiedBy, // Added
@@ -95,6 +107,8 @@ namespace Career_Management.Server.Controllers
                 FullName = employee.FullName,
                 PositionTitle = employee.Position?.PositionTitle ?? string.Empty,
                 DepartmentName = employee.Position?.DepartmentNavigation?.DepartmentName,
+                JobFunctionName = employee.Position?.JobFunction?.JobFunctionName,
+                JobGrade = employee.Position?.JobGrade?.JobGradeName,
                 ManagerName = employee.Manager?.FullName
             };
 
@@ -141,6 +155,7 @@ namespace Career_Management.Server.Controllers
             existingEmployee.Phone = employee.Phone;
             existingEmployee.Email = employee.Email;
             existingEmployee.HireDate = employee.HireDate;
+            existingEmployee.WorkerCategory = employee.WorkerCategory;
             existingEmployee.ModifiedDate = DateTime.Now;
             existingEmployee.ModifiedBy = employee.ModifiedBy; // Added
 

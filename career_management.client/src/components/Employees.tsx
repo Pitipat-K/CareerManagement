@@ -15,6 +15,7 @@ interface Employee {
   phone?: string;
   email?: string;
   hireDate?: string;
+  workerCategory?: string;
   createdDate: string;
   modifiedDate: string;
   modifiedBy?: number; // Added
@@ -47,6 +48,7 @@ interface EmployeeFormData {
   phone: string;
   email: string;
   hireDate: string;
+  workerCategory: string;
 }
 
 const Employees = () => {
@@ -68,7 +70,8 @@ const Employees = () => {
     gender: '',
     phone: '',
     email: '',
-    hireDate: ''
+    hireDate: '',
+    workerCategory: ''
   });
   const [errors, setErrors] = useState<Partial<EmployeeFormData>>({});
 
@@ -212,6 +215,7 @@ const Employees = () => {
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null,
         hireDate: formData.hireDate.trim() || null,
+        workerCategory: formData.workerCategory.trim() || null,
         isActive: true,
         createdDate: new Date().toISOString(),
         modifiedDate: new Date().toISOString(),
@@ -241,7 +245,8 @@ const Employees = () => {
         gender: '',
         phone: '',
         email: '',
-        hireDate: ''
+        hireDate: '',
+        workerCategory: ''
       });
       setErrors({});
       setShowModal(false);
@@ -278,7 +283,8 @@ const Employees = () => {
       gender: '',
       phone: '',
       email: '',
-      hireDate: ''
+      hireDate: '',
+      workerCategory: ''
     });
     setErrors({});
   };
@@ -305,7 +311,8 @@ const Employees = () => {
       gender: employee.gender || '',
       phone: employee.phone || '',
       email: employee.email || '',
-      hireDate: employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('en-CA') : ''
+      hireDate: employee.hireDate ? new Date(employee.hireDate).toLocaleDateString('en-CA') : '',
+      workerCategory: employee.workerCategory || ''
     });
     console.log('Form data set with managerID:', employee.managerID?.toString() || '');
     setShowModal(true);
@@ -315,7 +322,8 @@ const Employees = () => {
     employee.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.employeeCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    employee.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    employee.workerCategory?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -712,6 +720,22 @@ const Employees = () => {
                   onChange={(e) => handleInputChange('hireDate', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="workerCategory" className="block text-sm font-medium text-gray-700 mb-1">
+                  Worker Category
+                </label>
+                <select
+                  id="workerCategory"
+                  value={formData.workerCategory}
+                  onChange={(e) => handleInputChange('workerCategory', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select worker category</option>
+                  <option value="White collar">White collar</option>
+                  <option value="Blue collar">Blue collar</option>
+                </select>
               </div>
 
               <div className="flex space-x-3 pt-4">

@@ -22,38 +22,38 @@ namespace Career_Management.Server.Controllers
         public async Task<ActionResult<IEnumerable<PositionDto>>> GetPositions()
         {
             var positions = await _context.Positions
-                .Where(p => p.IsActive)
                 .Include(p => p.DepartmentNavigation)
-                .Include(p => p.LeadershipLevel)
                 .Include(p => p.JobGrade)
+                .Include(p => p.JobFunction)
                 .Include(p => p.ModifiedByEmployee)
+                .Where(p => p.IsActive)
+                .Select(p => new PositionDto
+                {
+                    PositionID = p.PositionID,
+                    PositionTitle = p.PositionTitle,
+                    PositionDescription = p.PositionDescription,
+                    ExperienceRequirement = p.ExperienceRequirement,
+                    JobGroup = p.JobGroup,
+                    JobFunctionID = p.JobFunctionID,
+                    JobFunctionName = p.JobFunction != null ? p.JobFunction.JobFunctionName : null,
+                    JobFamilyID = p.JobFamilyID,
+                    DepartmentID = p.DepartmentID,
+                    JobGradeID = p.JobGradeID,
+                    JobGradeName = p.JobGrade != null ? p.JobGrade.JobGradeName : null,
+                    LeadershipID = p.LeadershipID,
+                    IsActive = p.IsActive,
+                    CreatedDate = p.CreatedDate,
+                    ModifiedDate = p.ModifiedDate,
+                    ModifiedBy = p.ModifiedBy,
+                    ModifiedByEmployeeName = p.ModifiedByEmployee != null ? $"{p.ModifiedByEmployee.FirstName} {p.ModifiedByEmployee.LastName}".Trim() : null,
+                    Department = p.Department,
+                    JobFamily = p.JobFamily,
+                    DepartmentName = p.DepartmentNavigation != null ? p.DepartmentNavigation.DepartmentName : null,
+                    LeadershipLevel = p.LeadershipLevel != null ? p.LeadershipLevel.LevelName : null
+                })
                 .ToListAsync();
 
-            var positionDtos = positions.Select(p => new PositionDto
-            {
-                PositionID = p.PositionID,
-                PositionTitle = p.PositionTitle,
-                PositionDescription = p.PositionDescription,
-                ExperienceRequirement = p.ExperienceRequirement,
-                JobGroup = p.JobGroup,
-                JobFunction = p.JobFunction,
-                JobFamilyID = p.JobFamilyID,
-                DepartmentID = p.DepartmentID,
-                JobGradeID = p.JobGradeID,
-                JobGradeName = p.JobGrade != null ? p.JobGrade.JobGradeName : null,
-                LeadershipID = p.LeadershipID,
-                IsActive = p.IsActive,
-                CreatedDate = p.CreatedDate,
-                ModifiedDate = p.ModifiedDate,
-                ModifiedBy = p.ModifiedBy,
-                ModifiedByEmployeeName = p.ModifiedByEmployee != null ? $"{p.ModifiedByEmployee.FirstName} {p.ModifiedByEmployee.LastName}".Trim() : null,
-                Department = p.Department,
-                JobFamily = p.JobFamily,
-                DepartmentName = p.DepartmentNavigation != null ? p.DepartmentNavigation.DepartmentName : null,
-                LeadershipLevel = p.LeadershipLevel != null ? p.LeadershipLevel.LevelName : null
-            }).ToList();
-
-            return positionDtos;
+            return Ok(positions);
         }
 
         // GET: api/Positions/5
@@ -62,8 +62,8 @@ namespace Career_Management.Server.Controllers
         {
             var position = await _context.Positions
                 .Include(p => p.DepartmentNavigation)
-                .Include(p => p.LeadershipLevel)
                 .Include(p => p.JobGrade)
+                .Include(p => p.JobFunction)
                 .Include(p => p.ModifiedByEmployee)
                 .FirstOrDefaultAsync(p => p.PositionID == id && p.IsActive);
 
@@ -79,7 +79,8 @@ namespace Career_Management.Server.Controllers
                 PositionDescription = position.PositionDescription,
                 ExperienceRequirement = position.ExperienceRequirement,
                 JobGroup = position.JobGroup,
-                JobFunction = position.JobFunction,
+                JobFunctionID = position.JobFunctionID,
+                JobFunctionName = position.JobFunction != null ? position.JobFunction.JobFunctionName : null,
                 JobFamilyID = position.JobFamilyID,
                 DepartmentID = position.DepartmentID,
                 JobGradeID = position.JobGradeID,
@@ -170,7 +171,7 @@ namespace Career_Management.Server.Controllers
             existingPosition.PositionDescription = position.PositionDescription;
             existingPosition.ExperienceRequirement = position.ExperienceRequirement;
             existingPosition.JobGroup = position.JobGroup;
-            existingPosition.JobFunction = position.JobFunction;
+            existingPosition.JobFunctionID = position.JobFunctionID;
             existingPosition.JobFamilyID = position.JobFamilyID;
             existingPosition.DepartmentID = position.DepartmentID;
             existingPosition.JobGradeID = position.JobGradeID;

@@ -13,6 +13,7 @@ namespace Career_Management.Server.Models.DTOs
         public string? Phone { get; set; }
         public string? Email { get; set; }
         public DateTime? HireDate { get; set; }
+        public string? WorkerCategory { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime ModifiedDate { get; set; }
         public int? ModifiedBy { get; set; }
@@ -23,6 +24,8 @@ namespace Career_Management.Server.Models.DTOs
         // Position information
         public string? PositionTitle { get; set; }
         public string? DepartmentName { get; set; }
+        public string? JobFunctionName { get; set; }
+        public string? JobGrade { get; set; }
         
         // Manager information
         public string? ManagerName { get; set; }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Search, X, Clipboard, ChevronDown, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Clipboard, ChevronDown, Check, Save, Package, Globe, Lock } from 'lucide-react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
 
@@ -41,6 +41,19 @@ interface CompetencyRequirementFormData {
     isMandatory: boolean;
 }
 
+interface CompetencySet {
+    setID: number;
+    setName: string;
+    description?: string;
+    isPublic: boolean;
+    createdBy: number;
+    createdByEmployeeName?: string;
+    createdDate: string;
+    modifiedDate: string;
+    isActive: boolean;
+    competencyCount: number;
+}
+
 const CompetencyAssign = () => {
     const [positions, setPositions] = useState<PositionWithCompetencyCount[]>([]);
     const [competencies, setCompetencies] = useState<Competency[]>([]);
@@ -60,10 +73,21 @@ const CompetencyAssign = () => {
     const [isCompetencyDropdownOpen, setIsCompetencyDropdownOpen] = useState(false);
     const [competencySearchTerm, setCompetencySearchTerm] = useState('');
     const competencyDropdownRef = useRef<HTMLDivElement>(null);
+    
+    // New state for inline editing
+    const [inlineEditingId, setInlineEditingId] = useState<number | null>(null);
+    const [inlineEditingLevel, setInlineEditingLevel] = useState<string>('');
+    const [inlineSubmitting, setInlineSubmitting] = useState(false);
+    
+    // Competency set state
+    const [competencySets, setCompetencySets] = useState<CompetencySet[]>([]);
+    const [showCompetencySetModal, setShowCompetencySetModal] = useState(false);
+    const [] = useState<CompetencySet | null>(null);
 
     useEffect(() => {
         fetchPositions();
         fetchCompetencies();
+        fetchCompetencySets();
     }, []);
 
     // Close dropdown when clicking outside
@@ -98,6 +122,20 @@ const CompetencyAssign = () => {
         } catch (error) {
             console.error('Error fetching competencies:', error);
         }
+    };
+
+    const fetchCompetencySets = async () => {
+        try {
+            const response = await axios.get(getApiUrl('competencysets?isPublic=true'));
+            setCompetencySets(response.data);
+        } catch (error) {
+            console.error('Error fetching competency sets:', error);
+        }
+    };
+
+    const getCurrentEmployeeId = (): number | null => {
+        const currentEmployee = localStorage.getItem('currentEmployee');
+        return currentEmployee ? JSON.parse(currentEmployee).employeeID : null;
     };
 
     const fetchRequirements = async (positionId: number) => {
@@ -238,16 +276,70 @@ const CompetencyAssign = () => {
         setIsCompetencyDropdownOpen(false);
     };
 
-    const handleEditRequirement = (requirement: PositionCompetencyRequirement) => {
-        setEditingRequirement(requirement);
-        setFormData({
-            competencyID: requirement.competencyID.toString(),
-            requiredLevel: requirement.requiredLevel.toString(),
-            isMandatory: requirement.isMandatory
-        });
-        setShowModal(true);
-        setCompetencySearchTerm('');
-        setIsCompetencyDropdownOpen(false);
+
+    const handleInlineEdit = (requirement: PositionCompetencyRequirement) => {
+        setInlineEditingId(requirement.requirementID);
+        setInlineEditingLevel(requirement.requiredLevel.toString());
+    };
+
+    const handleInlineSave = async (requirementId: number) => {
+        const newLevel = parseInt(inlineEditingLevel);
+        if (isNaN(newLevel) || newLevel < 0 || newLevel > 4) {
+            alert('Required level must be between 0 and 4.');
+            return;
+        }
+
+        // Get current employee ID from localStorage
+        const currentEmployee = localStorage.getItem('currentEmployee');
+        const currentEmployeeId = currentEmployee ? JSON.parse(currentEmployee).employeeID : null;
+
+        if (!currentEmployeeId) {
+            alert('Please log in to perform this action.');
+            return;
+        }
+
+        // Find the current requirement to get all required fields
+        const currentRequirement = requirements.find(r => r.requirementID === requirementId);
+        if (!currentRequirement) {
+            alert('Requirement not found. Please refresh the page and try again.');
+            return;
+        }
+
+        setInlineSubmitting(true);
+        try {
+            await axios.put(getApiUrl(`positioncompetencyrequirements/${requirementId}`), {
+                requirementID: requirementId,
+                positionID: currentRequirement.positionID,
+                competencyID: currentRequirement.competencyID,
+                requiredLevel: newLevel,
+                isMandatory: currentRequirement.isMandatory,
+                isActive: currentRequirement.isActive,
+                modifiedBy: currentEmployeeId
+            });
+            
+            // Refresh the requirements list
+            if (selectedPosition) {
+                await fetchRequirements(selectedPosition.positionID);
+                await fetchPositions(); // Refresh position list to update counts
+            }
+            
+            setInlineEditingId(null);
+            setInlineEditingLevel('');
+        } catch (error: any) {
+            console.error('Error saving inline edit:', error);
+            if (error.response?.data) {
+                alert(error.response.data);
+            } else {
+                alert('Failed to save inline edit. Please try again.');
+            }
+        } finally {
+            setInlineSubmitting(false);
+        }
+    };
+
+    const handleInlineCancel = () => {
+        setInlineEditingId(null);
+        setInlineEditingLevel('');
     };
 
     const handleAddNew = () => {
@@ -293,6 +385,39 @@ const CompetencyAssign = () => {
         setCompetencySearchTerm('');
         if (errors.competencyID) {
             setErrors(prev => ({ ...prev, competencyID: undefined }));
+        }
+    };
+
+    const handleApplyCompetencySet = async (competencySet: CompetencySet) => {
+        if (!selectedPosition) {
+            alert('Please select a position first.');
+            return;
+        }
+
+        if (!window.confirm(`Are you sure you want to apply the competency set "${competencySet.setName}" to "${selectedPosition.positionTitle}"? This will replace all existing competency requirements.`)) {
+            return;
+        }
+
+        const currentEmployeeId = getCurrentEmployeeId();
+        if (!currentEmployeeId) {
+            alert('Please log in to perform this action.');
+            return;
+        }
+
+        try {
+            await axios.post(getApiUrl(`competencysets/${competencySet.setID}/apply-to-position`), {
+                positionID: selectedPosition.positionID,
+                modifiedBy: currentEmployeeId
+            });
+
+            // Refresh the requirements and position list
+            await fetchRequirements(selectedPosition.positionID);
+            await fetchPositions();
+            setShowCompetencySetModal(false);
+            alert(`Competency set "${competencySet.setName}" has been successfully applied to "${selectedPosition.positionTitle}".`);
+        } catch (error) {
+            console.error('Error applying competency set:', error);
+            alert('Error applying competency set. Please try again.');
         }
     };
 
@@ -392,17 +517,44 @@ const CompetencyAssign = () => {
                                     <h3 className="text-lg font-semibold text-gray-900">
                                         Competencies for {selectedPosition.positionTitle}
                                     </h3>
-                                    <p className="text-sm text-gray-600 text-left">
-                                        {requirements.length} assigned competencies
+                                    <p className="text-sm text-left">
+                                        <span className={`font-medium ${requirements.filter(r => r.requiredLevel === 0).length > 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                            {requirements.filter(r => r.requiredLevel > 0).length}/{requirements.length}
+                                        </span>
+                                        <span className="text-gray-600"> assigned competencies</span>
+                                        {requirements.filter(r => r.requiredLevel === 0).length > 0 && (
+                                            <span className="text-red-500 text-xs ml-2">
+                                                ({requirements.filter(r => r.requiredLevel === 0).length} without targets)
+                                            </span>
+                                        )}
                                     </p>
                                 </div>
-                                <button
-                                    onClick={handleAddNew}
-                                    className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                                >
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Competency
-                                </button>
+                                <div className="flex space-x-2">
+                                    <button
+                                        onClick={() => setShowCompetencySetModal(true)}
+                                        className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                                    >
+                                        <Package className="w-4 h-4 mr-2" />
+                                        Apply Set
+                                    </button>
+                                    <button
+                                        onClick={handleAddNew}
+                                        className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                                    >
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Add Competency
+                                    </button>
+                                    {inlineEditingId !== null && (
+                                        <button
+                                            onClick={() => setInlineEditingId(null)}
+                                            className="inline-flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                                            title="Close inline editing mode"
+                                        >
+                                            <X className="w-4 h-4 mr-2" />
+                                            Close Edit
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="overflow-x-auto -mx-3 sm:mx-0">
@@ -426,7 +578,7 @@ const CompetencyAssign = () => {
                                                     Domain
                                                 </th>
                                                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                                                    Required Level
+                                                    Required
                                                 </th>
                                                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     Modified By
@@ -444,8 +596,9 @@ const CompetencyAssign = () => {
                                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                         <div className="flex items-center justify-end space-x-2">
                                                             <button
-                                                                onClick={() => handleEditRequirement(requirement)}
+                                                                onClick={() => handleInlineEdit(requirement)}
                                                                 className="text-blue-600 hover:text-blue-900 p-1"
+                                                                title="Edit Required Level"
                                                             >
                                                                 <Edit className="w-4 h-4" />
                                                             </button>
@@ -473,9 +626,46 @@ const CompetencyAssign = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-left">
-                                                        <div className="text-sm text-gray-900">
-                                                            Level {requirement.requiredLevel}
-                                                        </div>
+                                                        {inlineEditingId === requirement.requirementID ? (
+                                                            <div className="flex items-center space-x-2">
+                                                                <select
+                                                                    value={inlineEditingLevel}
+                                                                    onChange={(e) => setInlineEditingLevel(e.target.value)}
+                                                                    className="px-2 py-1 border border-gray-300 rounded-md text-sm text-gray-900 bg-white"
+                                                                    disabled={inlineSubmitting}
+                                                                >
+                                                                    <option value="0">Level 0</option>
+                                                                    <option value="1">Level 1</option>
+                                                                    <option value="2">Level 2</option>
+                                                                    <option value="3">Level 3</option>
+                                                                    <option value="4">Level 4</option>
+                                                                </select>
+                                                                <button
+                                                                    onClick={() => handleInlineSave(requirement.requirementID)}
+                                                                    className="text-green-600 hover:text-green-900 p-1"
+                                                                    disabled={inlineSubmitting}
+                                                                    title="Save changes"
+                                                                >
+                                                                    {inlineSubmitting ? (
+                                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                                                                    ) : (
+                                                                        <Save className="w-4 h-4" />
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    onClick={handleInlineCancel}
+                                                                    className="text-red-600 hover:text-red-900 p-1"
+                                                                    disabled={inlineSubmitting}
+                                                                    title="Cancel editing"
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-sm text-gray-900">
+                                                                Level {requirement.requiredLevel}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-left">
                                                         <div className="text-sm text-gray-900">
@@ -649,6 +839,64 @@ const CompetencyAssign = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Competency Set Modal */}
+            {showCompetencySetModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold">Apply Competency Set</h2>
+                            <button
+                                onClick={() => setShowCompetencySetModal(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        
+                        <div className="mb-4">
+                            <p className="text-gray-600">
+                                Select a competency set to apply to "{selectedPosition?.positionTitle}". 
+                                This will replace all existing competency requirements.
+                            </p>
+                        </div>
+
+                        <div className="space-y-3">
+                            {competencySets.map((set) => (
+                                <div key={set.setID} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div className="flex-1">
+                                        <div className="flex items-center space-x-2 mb-2">
+                                            {set.isPublic ? (
+                                                <Globe className="w-4 h-4 text-blue-600" />
+                                            ) : (
+                                                <Lock className="w-4 h-4 text-gray-600" />
+                                            )}
+                                            <h4 className="font-medium text-gray-900">{set.setName}</h4>
+                                        </div>
+                                        {set.description && (
+                                            <p className="text-sm text-gray-600 mb-2">{set.description}</p>
+                                        )}
+                                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                            <span>{set.competencyCount} competencies</span>
+                                            <span>by {set.createdByEmployeeName || 'Unknown'}</span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleApplyCompetencySet(set)}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                        Apply Set
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        {competencySets.length === 0 && (
+                            <p className="text-gray-500 text-center py-8">No competency sets available.</p>
+                        )}
                     </div>
                 </div>
             )}

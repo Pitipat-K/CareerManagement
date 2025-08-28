@@ -24,10 +24,21 @@ namespace Career_Management.Server.Data
         public DbSet<CompetencyScore> CompetencyScores { get; set; }
         public DbSet<EmployeeDevelopmentPlan> EmployeeDevelopmentPlans { get; set; }
         public DbSet<JobGrade> JobGrades { get; set; }
+        public DbSet<JobFunction> JobFunctions { get; set; }
+        public DbSet<CompetencySet> CompetencySets { get; set; }
+        public DbSet<CompetencySetItem> CompetencySetItems { get; set; }
+        
+        // View for Competency Progress
+        public DbSet<CompetencyProgress> CompetencyProgress { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Configure CompetencyProgress as a keyless entity (view)
+            modelBuilder.Entity<CompetencyProgress>()
+                .HasNoKey()
+                .ToView("vw_CompetencyProgress");
 
             // Configure relationships
             modelBuilder.Entity<Company>()
@@ -42,6 +53,12 @@ namespace Career_Management.Server.Data
                 .HasForeignKey(p => p.DepartmentID)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            modelBuilder.Entity<Department>()
+                .HasMany(d => d.JobFunctions)
+                .WithOne(jf => jf.Department)
+                .HasForeignKey(jf => jf.DepartmentID)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<Position>()
                 .HasMany(p => p.Employees)
                 .WithOne(e => e.Position)
@@ -52,6 +69,12 @@ namespace Career_Management.Server.Data
                 .HasOne(p => p.JobGrade)
                 .WithMany()
                 .HasForeignKey(p => p.JobGradeID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Position>()
+                .HasOne(p => p.JobFunction)
+                .WithMany(jf => jf.Positions)
+                .HasForeignKey(p => p.JobFunctionID)
                 .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Position>()
@@ -206,6 +229,25 @@ namespace Career_Management.Server.Data
                 .WithMany()
                 .HasForeignKey(ac => ac.CreatedBy)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // CompetencySet relationships
+            modelBuilder.Entity<CompetencySet>()
+                .HasOne(cs => cs.CreatedByEmployee)
+                .WithMany()
+                .HasForeignKey(cs => cs.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CompetencySetItem>()
+                .HasOne(csi => csi.CompetencySet)
+                .WithMany(cs => cs.CompetencySetItems)
+                .HasForeignKey(csi => csi.SetID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CompetencySetItem>()
+                .HasOne(csi => csi.Competency)
+                .WithMany()
+                .HasForeignKey(csi => csi.CompetencyID)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 } 

@@ -39,8 +39,10 @@ const CareerPath = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
-  const [selectedJobGrade, setSelectedJobGrade] = useState<string>('');
+       const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const [selectedJobGrades, setSelectedJobGrades] = useState<string[]>([]);
+  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
+  const [showJobGradeDropdown, setShowJobGradeDropdown] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [showPositionModal, setShowPositionModal] = useState(false);
   const [userCompetencies, setUserCompetencies] = useState<{[key: number]: number}>({});
@@ -49,6 +51,22 @@ const CareerPath = () => {
 
   useEffect(() => {
     fetchCareerPathData();
+  }, []);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.department-dropdown') && !target.closest('.jobgrade-dropdown')) {
+        setShowDepartmentDropdown(false);
+        setShowJobGradeDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   // Auto-scroll to current position when userCurrentPosition changes
@@ -221,15 +239,19 @@ const CareerPath = () => {
       position.positionTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (position.positionDescription && position.positionDescription.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesDepartment = selectedDepartment === '' || position.departmentName === selectedDepartment;
-    const matchesJobGrade = selectedJobGrade === '' || position.jobGrade === selectedJobGrade;
+         const matchesDepartment = selectedDepartments.length === 0 || selectedDepartments.includes(position.departmentName || '');
+     const matchesJobGrade = selectedJobGrades.length === 0 || selectedJobGrades.includes(position.jobGrade || '');
     
     return matchesSearch && matchesDepartment && matchesJobGrade;
   });
 
   const totalFilteredPositions = filteredPositions.length;
 
-  // Get departments and job grades that have positions after filtering
+  // Get all departments and job grades for the dropdowns (not filtered)
+  const allDepartments = sortedDepartments;
+  const allJobGrades = sortedJobGrades;
+  
+  // Get departments and job grades that have positions after filtering (for table display only)
   const activeDepartments = sortedDepartments.filter(dept => 
     filteredPositions.some(position => position.departmentName === dept.departmentName)
   );
@@ -483,59 +505,152 @@ const CareerPath = () => {
               />
             </div>
             
-            <div className="sm:w-48">
-              <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
-                Department
-              </label>
-              <select
-                id="department"
-                value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Departments</option>
-                {activeDepartments.map((dept) => (
-                  <option key={dept.departmentID} value={dept.departmentName}>
-                    {dept.departmentName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="sm:w-48">
-              <label htmlFor="jobGrade" className="block text-sm font-medium text-gray-700 mb-2">
-                Job Grade
-              </label>
-              <select
-                id="jobGrade"
-                value={selectedJobGrade}
-                onChange={(e) => setSelectedJobGrade(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Job Grades</option>
-                {activeJobGrades.map((jg) => (
-                  <option key={jg.jobGradeID} value={jg.jobGradeName}>
-                    {jg.jobGradeName}
-                  </option>
-                ))}
-              </select>
-            </div>
+                         <div className="sm:w-64 relative department-dropdown">
+               <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
+                 Department {selectedDepartments.length > 0 && <span className="text-blue-600">({selectedDepartments.length} selected)</span>}
+                 <span className="ml-1 text-xs text-gray-500">(Multiple)</span>
+               </label>
+               <div className="relative">
+                 <button
+                   type="button"
+                   onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
+                 >
+                   <span className={selectedDepartments.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                     {selectedDepartments.length === 0 ? 'All Departments' : `${selectedDepartments.length} selected`}
+                   </span>
+                   <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                   </svg>
+                 </button>
+                 
+                 {showDepartmentDropdown && (
+                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                     <div className="p-2">
+                       <div className="flex items-center justify-between mb-2">
+                         <span className="text-sm font-medium text-gray-700"></span>
+                         <div className="flex space-x-2">
+                           <button
+                             onClick={() => setSelectedDepartments(allDepartments.map(d => d.departmentName))}
+                             className="text-xs text-green-600 hover:text-green-800"
+                           >
+                             Select All
+                           </button>
+                           <button
+                             onClick={() => setSelectedDepartments([])}
+                             className="text-xs text-blue-600 hover:text-blue-800"
+                           >
+                             Clear All
+                           </button>
+                         </div>
+                       </div>
+                       {allDepartments.map((dept) => (
+                         <label key={dept.departmentID} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                           <input
+                             type="checkbox"
+                             checked={selectedDepartments.includes(dept.departmentName)}
+                             onChange={(e) => {
+                               if (e.target.checked) {
+                                 setSelectedDepartments([...selectedDepartments, dept.departmentName]);
+                               } else {
+                                 setSelectedDepartments(selectedDepartments.filter(d => d !== dept.departmentName));
+                               }
+                             }}
+                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                           />
+                           <span className="ml-2 text-sm text-gray-700">{dept.departmentName}</span>
+                         </label>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+               </div>
+               <div className="text-xs text-gray-500 mt-1">
+                 ✓ Click to select multiple departments
+               </div>
+             </div>
+             
+             <div className="sm:w-48 relative jobgrade-dropdown">
+               <label htmlFor="jobGrade" className="block text-sm font-medium text-gray-700 mb-2">
+                 Job Grade {selectedJobGrades.length > 0 && <span className="text-blue-600">({selectedJobGrades.length} selected)</span>}
+                 <span className="ml-1 text-xs text-gray-500">(Multiple)</span>
+               </label>
+               <div className="relative">
+                 <button
+                   type="button"
+                   onClick={() => setShowJobGradeDropdown(!showJobGradeDropdown)}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
+                 >
+                   <span className={selectedJobGrades.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                     {selectedJobGrades.length === 0 ? 'All Job Grades' : `${selectedJobGrades.length} selected`}
+                   </span>
+                   <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                   </svg>
+                 </button>
+                 
+                 {showJobGradeDropdown && (
+                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                     <div className="p-2">
+                       <div className="flex items-center justify-between mb-2">
+                         <span className="text-sm font-medium text-gray-700"></span>
+                         <div className="flex space-x-2">
+                           <button
+                             onClick={() => setSelectedJobGrades(allJobGrades.map(j => j.jobGradeName))}
+                             className="text-xs text-green-600 hover:text-green-800"
+                           >
+                             Select All
+                           </button>
+                           <button
+                             onClick={() => setSelectedJobGrades([])}
+                             className="text-xs text-blue-600 hover:text-blue-800"
+                             
+                           >
+                             Clear All
+                           </button>
+                         </div>
+                       </div>
+                       {allJobGrades.map((jg) => (
+                         <label key={jg.jobGradeID} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                           <input
+                             type="checkbox"
+                             checked={selectedJobGrades.includes(jg.jobGradeName)}
+                             onChange={(e) => {
+                               if (e.target.checked) {
+                                 setSelectedJobGrades([...selectedJobGrades, jg.jobGradeName]);
+                               } else {
+                                 setSelectedJobGrades(selectedJobGrades.filter(j => j !== jg.jobGradeName));
+                               }
+                             }}
+                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                           />
+                           <span className="ml-2 text-sm text-gray-700">{jg.jobGradeName}</span>
+                         </label>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+               </div>
+               <div className="text-xs text-gray-500 mt-1">
+                 ✓ Click to select multiple job grades
+               </div>
+             </div>
           </div>
           
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600">
               Showing {totalFilteredPositions} of {totalPositions} positions
             </div>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedDepartment('');
-                setSelectedJobGrade('');
-              }}
-              className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            >
-              Clear Filters
-            </button>
+                         <button
+               onClick={() => {
+                 setSearchTerm('');
+                 setSelectedDepartments([]);
+                 setSelectedJobGrades([]);
+               }}
+               className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+             >
+               Clear Filters
+             </button>
           </div>
         </div>
         
@@ -551,16 +666,16 @@ const CareerPath = () => {
             <p className="text-gray-600 mb-4">
               Try adjusting your search criteria or filters to find more positions.
             </p>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedDepartment('');
-                setSelectedJobGrade('');
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Clear All Filters
-            </button>
+                         <button
+               onClick={() => {
+                 setSearchTerm('');
+                 setSelectedDepartments([]);
+                 setSelectedJobGrades([]);
+               }}
+               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+             >
+               Clear All Filters
+             </button>
           </div>
                  ) : (
            <div className="relative">
@@ -622,15 +737,16 @@ const CareerPath = () => {
                                          </span>
                                        )}
                                      </div>
-                                     {position.requiredCompetencies && position.requiredCompetencies.length > 0 && (
+                                     {position.jobGrade && (
                                        <div className={`text-xs mt-1 ${
                                          userCurrentPosition && userCurrentPosition.positionID === position.positionID
-                                           ? 'text-green-600'
-                                           : 'text-blue-600'
+                                           ? 'text-green-700'
+                                           : 'text-blue-700'
                                        }`}>
-                                         {position.requiredCompetencies.length} competencies required
+                                         {position.jobGrade}
+                                         {position.jobGradeLevel && ` (Level ${position.jobGradeLevel})`}
                                        </div>
-                                     )}
+                                     )}                                     
                                    </div>
                                  ))}
                                </div>

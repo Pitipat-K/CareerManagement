@@ -38,7 +38,6 @@ interface CompetencyDashboardProps {
 const CompetencyDashboard = ({ employeeId }: CompetencyDashboardProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selfAssessment, setSelfAssessment] = useState<AssessmentWithCompetenciesDto | null>(null);
   const [managerAssessment, setManagerAssessment] = useState<AssessmentWithCompetenciesDto | null>(null);
 
   useEffect(() => {
@@ -67,10 +66,6 @@ const CompetencyDashboard = ({ employeeId }: CompetencyDashboardProps) => {
       const combinedRes = await fetch(getApiUrl(`Assessments/cycle/${latestCycle.cycleID}/combined`));
       if (!combinedRes.ok) throw new Error('Failed to fetch combined assessment data');
       const combinedData = await combinedRes.json();
-      setSelfAssessment({
-        ...combinedData,
-        competencies: combinedData.competencies.map((c: any) => ({ ...c })),
-      });
       setManagerAssessment({
         ...combinedData,
         competencies: combinedData.competencies.map((c: any) => ({ ...c })),
@@ -90,6 +85,15 @@ const CompetencyDashboard = ({ employeeId }: CompetencyDashboardProps) => {
       domains[c.domainName].push(c);
     });
     return domains;
+  };
+
+  // Group competencies by category
+
+  // Get competencies for specific domain or category
+  const getCompetenciesForChart = (competencies: CompetencyAssessmentDto[], filterType: 'domain' | 'category', filterValue: string) => {
+    return competencies.filter(c => 
+      filterType === 'domain' ? c.domainName === filterValue : c.categoryName === filterValue
+    );
   };
 
   // Utility to wrap text for radar chart labels
@@ -145,77 +149,165 @@ const CompetencyDashboard = ({ employeeId }: CompetencyDashboardProps) => {
   if (error) {
     return <div className="text-center py-12 text-red-500">{error}</div>;
   }
-  if (!selfAssessment || !managerAssessment) {
+  if (!managerAssessment) {
     return <div className="text-center py-12 text-gray-500">No assessment data available.</div>;
   }
 
-  const domains = groupByDomain(selfAssessment.competencies);
+  const domains = groupByDomain(managerAssessment.competencies);
+
+  // Debug: Log what's in each domain
+  console.log('All domains:', domains);
+  console.log('Knowledge domain competencies:', domains['Knowledge'] || []);
+  console.log('Attributes domain competencies:', domains['Attributes'] || []);
+
+
 
   return (
     <div className="bg-white rounded-lg shadow-sm border">
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-xl text-left font-semibold text-gray-900">Competency Dashboard</h2>
-        <p className="text-sm text-left text-gray-600">Visualize your competency scores versus targets by domain</p>
+        <p className="text-sm text-left text-gray-600">Manager assessment scores for different competency areas</p>
       </div>
-      <div className="p-6 space-y-12">
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Self Assessment</h3>
-          {/* <p className="text-sm text-gray-600 mb-4">Your self-assessed scores for each competency domain</p> */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-            {Object.entries(domains).map(([domain, comps]) => (
-              <div key={domain} className="bg-gray-50 rounded-lg border p-6 flex flex-col items-center">
-                <h4 className="text-base font-medium mb-2 text-gray-800">{domain}</h4>
-                <Radar
-                  data={getRadarData(comps, 'selfLevel')}
-                  options={{
-                    responsive: true,
-                    scales: {
-                      r: {
-                        min: 0,
-                        max: 4,
-                        ticks: { stepSize: 1, display: false },
-                        pointLabels: { font: { size: 10 } },
-                      },
-                    },
-                    plugins: {
-                      legend: { position: 'bottom' as const },
-                    },
-                  }}
-                  style={{ maxWidth: 400, maxHeight: 400 }}
-                />
-              </div>
-            ))}
+      
+
+      
+      <div className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* 1. Knowledge (Domain) */}
+          <div className="bg-gray-50 rounded-lg border p-6 flex flex-col items-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Knowledge (Domain)</h3>
+            <Radar
+              data={getRadarData(
+                getCompetenciesForChart(managerAssessment.competencies, 'domain', 'Knowledge'),
+                'managerLevel'
+              )}
+              options={{
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                  r: {
+                    min: 0,
+                    max: 4,
+                    ticks: { stepSize: 1, display: false },
+                    pointLabels: { font: { size: 10 } },
+                  },
+                },
+                plugins: {
+                  legend: { position: 'bottom' as const },
+                },
+              }}
+              style={{ width: '100%', maxWidth: 350, height: 350 }}
+            />
           </div>
-        </section>
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Manager Assessment</h3>
-          {/* <p className="text-sm text-gray-600 mb-4">Scores assessed by your manager for each domain</p> */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-            {Object.entries(domains).map(([domain, comps]) => (
-              <div key={domain} className="bg-gray-50 rounded-lg border p-6 flex flex-col items-center">
-                <h4 className="text-base font-medium mb-2 text-gray-800">{domain}</h4>
-                <Radar
-                  data={getRadarData(comps, 'managerLevel')}
-                  options={{
-                    responsive: true,
-                    scales: {
-                      r: {
-                        min: 0,
-                        max: 4,
-                        ticks: { stepSize: 1, display: false },
-                        pointLabels: { font: { size: 10 } },
-                      },
-                    },
-                    plugins: {
-                      legend: { position: 'bottom' as const },
-                    },
-                  }}
-                  style={{ maxWidth: 400, maxHeight: 400 }}
-                />
-              </div>
-            ))}
+
+          {/* 2. Technical Knowledge (Category) */}
+          <div className="bg-gray-50 rounded-lg border p-6 flex flex-col items-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Technical Knowledge (Category)</h3>
+            <Radar
+              data={getRadarData(
+                getCompetenciesForChart(managerAssessment.competencies, 'category', 'Technical knowledge'),
+                'managerLevel'
+              )}
+              options={{
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                  r: {
+                    min: 0,
+                    max: 4,
+                    ticks: { stepSize: 1, display: false },
+                    pointLabels: { font: { size: 10 } },
+                  },
+                },
+                plugins: {
+                  legend: { position: 'bottom' as const },
+                },
+              }}
+              style={{ width: '100%', maxWidth: 350, height: 350 }}
+            />
           </div>
-        </section>
+
+          {/* 3. Core Skills (Category) */}
+          <div className="bg-gray-50 rounded-lg border p-6 flex flex-col items-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Core Skills (Category)</h3>
+            <Radar
+              data={getRadarData(
+                getCompetenciesForChart(managerAssessment.competencies, 'category', 'Core skills'),
+                'managerLevel'
+              )}
+              options={{
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                  r: {
+                    min: 0,
+                    max: 4,
+                    ticks: { stepSize: 1, display: false },
+                    pointLabels: { font: { size: 10 } },
+                  },
+                },
+                plugins: {
+                  legend: { position: 'bottom' as const },
+                },
+              }}
+              style={{ width: '100%', maxWidth: 350, height: 350 }}
+            />
+          </div>
+
+          {/* 4. English Language Skills (Category) */}
+          <div className="bg-gray-50 rounded-lg border p-6 flex flex-col items-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">English Language Skills (Category)</h3>
+            <Radar
+              data={getRadarData(
+                getCompetenciesForChart(managerAssessment.competencies, 'category', 'English language skill'),
+                'managerLevel'
+              )}
+              options={{
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                  r: {
+                    min: 0,
+                    max: 4,
+                    ticks: { stepSize: 1, display: false },
+                    pointLabels: { font: { size: 10 } },
+                  },
+                },
+                plugins: {
+                  legend: { position: 'bottom' as const },
+                },
+              }}
+              style={{ width: '100%', maxWidth: 350, height: 350 }}
+            />
+          </div>
+
+          {/* 5. Attributes (Domain) */}
+          <div className="bg-gray-50 rounded-lg border p-6 flex flex-col items-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Attributes (Domain)</h3>
+            <Radar
+              data={getRadarData(
+                getCompetenciesForChart(managerAssessment.competencies, 'domain', 'Attributes'),
+                'managerLevel'
+              )}
+              options={{
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                  r: {
+                    min: 0,
+                    max: 4,
+                    ticks: { stepSize: 1, display: false },
+                    pointLabels: { font: { size: 10 } },
+                  },
+                },
+                plugins: {
+                  legend: { position: 'bottom' as const },
+                },
+              }}
+              style={{ width: '100%', maxWidth: 350, height: 350 }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

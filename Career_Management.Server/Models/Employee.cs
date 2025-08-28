@@ -38,6 +38,9 @@ namespace Career_Management.Server.Models
         
         public DateTime? HireDate { get; set; }
         
+        [StringLength(50)]
+        public string? WorkerCategory { get; set; }
+        
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         
         public DateTime ModifiedDate { get; set; } = DateTime.Now;

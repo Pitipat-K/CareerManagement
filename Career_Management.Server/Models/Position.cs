@@ -21,8 +21,7 @@ namespace Career_Management.Server.Models
         [StringLength(100)]
         public string? JobGroup { get; set; }
         
-        [StringLength(200)]
-        public string? JobFunction { get; set; }
+        public int? JobFunctionID { get; set; }
         
         public int? JobFamilyID { get; set; }
         
@@ -59,6 +58,10 @@ namespace Career_Management.Server.Models
         [ForeignKey("JobGradeID")]
         [JsonIgnore]
         public virtual JobGrade? JobGrade { get; set; }
+        
+        [ForeignKey("JobFunctionID")]
+        [JsonIgnore]
+        public virtual JobFunction? JobFunction { get; set; }
         
         [ForeignKey("ModifiedBy")]
         [JsonIgnore]

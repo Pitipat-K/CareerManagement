@@ -7,7 +7,8 @@ namespace Career_Management.Server.Models.DTOs
         public string? PositionDescription { get; set; }
         public int? ExperienceRequirement { get; set; }
         public string? JobGroup { get; set; }
-        public string? JobFunction { get; set; }
+        public int? JobFunctionID { get; set; }
+        public string? JobFunctionName { get; set; }
         public int? JobFamilyID { get; set; }
         public int? DepartmentID { get; set; }
         public int? JobGradeID { get; set; }
