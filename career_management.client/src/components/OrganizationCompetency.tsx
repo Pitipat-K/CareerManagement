@@ -85,12 +85,12 @@ const OrganizationCompetency = () => {
   const [jobFunctions, setJobFunctions] = useState<JobFunction[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [jobGrades, setJobGrades] = useState<JobGrade[]>([]);
-  const [competencyDomains, setCompetencyDomains] = useState<CompetencyDomain[]>([]);
+  const [, setCompetencyDomains] = useState<CompetencyDomain[]>([]);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [positionRequirements, setPositionRequirements] = useState<PositionCompetencyRequirement[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [competencyScores, setCompetencyScores] = useState<CompetencyScore[]>([]);
-  const [competencyProgress, setCompetencyProgress] = useState<CompetencyProgress[]>([]);
+  const [, setCompetencyProgress] = useState<CompetencyProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,6 +108,10 @@ const OrganizationCompetency = () => {
   const [departmentSearch, setDepartmentSearch] = useState('');
   const [jobFunctionSearch, setJobFunctionSearch] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
+
+  // State for expanding/collapsing domains and categories
+  const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchData();
@@ -393,11 +397,35 @@ const OrganizationCompetency = () => {
     );
   }
 
+  const toggleDomain = (domainName: string) => {
+    setExpandedDomains(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(domainName)) {
+        newSet.delete(domainName);
+      } else {
+        newSet.add(domainName);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleCategory = (categoryKey: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryKey)) {
+        newSet.delete(categoryKey);
+      } else {
+        newSet.add(categoryKey);
+      }
+      return newSet;
+    });
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-white rounded-lg shadow-sm border p-4">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-left text-gray-900">Organization Competency</h2>
             <p className="text-sm text-left text-gray-600">
@@ -407,10 +435,10 @@ const OrganizationCompetency = () => {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
           {/* Department Filter */}
           <div className="relative department-dropdown">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Department {selectedDepartments.length > 0 && <span className="text-blue-600">({selectedDepartments.length} selected)</span>}
               <span className="ml-1 text-xs text-gray-500">(Multiple)</span>
             </label>
@@ -418,27 +446,27 @@ const OrganizationCompetency = () => {
               <button
                 type="button"
                 onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
               >
                 <span className={selectedDepartments.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
                   {selectedDepartments.length === 0 ? 'All Departments' : `${selectedDepartments.length} selected`}
                 </span>
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
               
                              {showDepartmentDropdown && (
                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                   <div className="p-2">
+                   <div className="p-1.5">
                      {/* Search Input */}
-                     <div className="mb-3">
+                     <div className="mb-2">
                        <input
                          type="text"
                          placeholder="Search departments..."
                          value={departmentSearch}
                          onChange={(e) => setDepartmentSearch(e.target.value)}
-                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                         className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                        />
                      </div>
                      
@@ -499,7 +527,7 @@ const OrganizationCompetency = () => {
 
           {/* Job Function Filter */}
           <div className="relative jobfunction-dropdown">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Job Function {selectedJobFunctions.length > 0 && <span className="text-blue-600">({selectedJobFunctions.length} selected)</span>}
               <span className="ml-1 text-xs text-gray-500">(Multiple)</span>
             </label>
@@ -507,27 +535,27 @@ const OrganizationCompetency = () => {
               <button
                 type="button"
                 onClick={() => setShowJobFunctionDropdown(!showJobFunctionDropdown)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
               >
                 <span className={selectedJobFunctions.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
                   {selectedJobFunctions.length === 0 ? 'All Job Functions' : `${selectedJobFunctions.length} selected`}
                 </span>
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
               
                              {showJobFunctionDropdown && (
                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                   <div className="p-2">
+                   <div className="p-1.5">
                      {/* Search Input */}
-                     <div className="mb-3">
+                     <div className="mb-2">
                        <input
                          type="text"
                          placeholder="Search job functions..."
                          value={jobFunctionSearch}
                          onChange={(e) => setJobFunctionSearch(e.target.value)}
-                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                         className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                        />
                      </div>
                      
@@ -588,7 +616,7 @@ const OrganizationCompetency = () => {
 
           {/* Employee Filter */}
           <div className="relative employee-dropdown">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
               Employee {selectedEmployees.length > 0 && <span className="text-blue-600">({selectedEmployees.length} selected)</span>}
               <span className="ml-1 text-xs text-gray-500">(Multiple)</span>
             </label>
@@ -596,27 +624,27 @@ const OrganizationCompetency = () => {
               <button
                 type="button"
                 onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
               >
                 <span className={selectedEmployees.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
                   {selectedEmployees.length === 0 ? 'All Employees' : `${selectedEmployees.length} selected`}
                 </span>
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
               
                              {showEmployeeDropdown && (
                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                   <div className="p-2">
+                   <div className="p-1.5">
                      {/* Search Input */}
-                     <div className="mb-3">
+                     <div className="mb-2">
                        <input
                          type="text"
                          placeholder="Search employees..."
                          value={employeeSearch}
                          onChange={(e) => setEmployeeSearch(e.target.value)}
-                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                         className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                        />
                      </div>
                      
@@ -772,7 +800,7 @@ const OrganizationCompetency = () => {
                       ))}
                       
                       {/* Draw domain axis lines */}
-                      {domainAchievementData.map((domain, index) => {
+                      {domainAchievementData.map((_, index) => {
                         const angle = (index * 2 * Math.PI) / domainAchievementData.length - Math.PI / 2;
                         const x1 = 150;
                         const y1 = 150;
@@ -874,37 +902,327 @@ const OrganizationCompetency = () => {
            </div>
         </div>
 
-        {/* Right Column - Bar Chart */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <div className="flex items-center mb-6">
-              <div className="p-2 bg-blue-100 rounded-full">
-                <BarChart3 className="w-5 h-5 text-blue-600" />
-              </div>
-              <h3 className="ml-3 text-lg font-semibold text-gray-900">Employee Distribution by Job Grade</h3>
-            </div>
-            
-                         {/* Column Chart */}
-             <div className="flex items-end justify-between h-64 space-x-2">
-               {chartData.map((item, index) => {
-                 const maxCount = Math.max(...chartData.map(d => d.count));
-                 const columnHeight = item.count === 0 ? 4 : Math.max(20, (item.count / maxCount) * 240);
-                 return (
-                   <div key={index} className="flex flex-col items-center flex-1">
-                     <div className="text-xs text-gray-600 mb-2 text-center font-medium">{item.count}</div>
-                     <div 
-                       className="w-full bg-blue-600 rounded-t transition-all duration-300"
-                       style={{ height: `${columnHeight}px` }}
-                     ></div>
-                     <div className="text-xs text-gray-600 mt-2 text-center truncate w-full">
-                       {item.name}
-                     </div>
-                   </div>
-                 );
-               })}
+                 {/* Right Column - Bar Chart */}
+         <div className="lg:col-span-2">
+           <div className="bg-white rounded-lg shadow-sm border p-6">
+             <div className="flex items-center mb-6">
+               <div className="p-2 bg-blue-100 rounded-full">
+                 <BarChart3 className="w-5 h-5 text-blue-600" />
+               </div>
+               <h3 className="ml-3 text-lg font-semibold text-gray-900">Employee Distribution by Job Grade</h3>
              </div>
-          </div>
-        </div>
+             
+                          {/* Column Chart */}
+              <div className="flex items-end justify-between h-64 space-x-2 mb-8">
+                {chartData.map((item, index) => {
+                  const maxCount = Math.max(...chartData.map(d => d.count));
+                  const columnHeight = item.count === 0 ? 4 : Math.max(20, (item.count / maxCount) * 240);
+                  return (
+                    <div key={index} className="flex flex-col items-center flex-1">
+                      <div className="text-xs text-gray-600 mb-2 text-center font-medium">{item.count}</div>
+                      <div 
+                        className="w-full bg-blue-600 rounded-t transition-all duration-300"
+                        style={{ height: `${columnHeight}px` }}
+                      ></div>
+                      <div className="text-xs text-gray-600 mt-2 text-center truncate w-full">
+                        {item.name}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Competency Hierarchy Table */}
+              <div className="border-t pt-6">
+                <div className="flex items-center mb-4">
+                  <div className="p-2 bg-green-100 rounded-full">
+                    <BarChart3 className="w-4 h-4 text-green-600" />
+                  </div>
+                  <h4 className="ml-2 text-md font-semibold text-gray-900">Competency Progress by Hierarchy</h4>
+                </div>
+                
+                <div className="space-y-4">
+                  {(() => {
+                    // Group competencies by domain and category
+                    const domainGroups = competencies.reduce((acc, competency) => {
+                      if (!competency.domainName) return acc;
+                      
+                      if (!acc[competency.domainName]) {
+                        acc[competency.domainName] = {};
+                      }
+                      
+                      if (!acc[competency.domainName][competency.categoryName || 'Uncategorized']) {
+                        acc[competency.domainName][competency.categoryName || 'Uncategorized'] = [];
+                      }
+                      
+                      acc[competency.domainName][competency.categoryName || 'Uncategorized'].push(competency);
+                      return acc;
+                    }, {} as Record<string, Record<string, Competency[]>>);
+
+                    return Object.entries(domainGroups).map(([domainName, categoryGroups]) => {
+                      const isDomainExpanded = expandedDomains.has(domainName);
+                      
+                      // Calculate domain-level progress
+                      let domainAssignedCount = 0;
+                      let domainAchievedCount = 0;
+                      
+                      Object.entries(categoryGroups).forEach(([, categoryCompetencies]) => {
+                        categoryCompetencies.forEach(competency => {
+                          filteredEmployees.forEach(employee => {
+                            const isRequired = positionRequirements.some(req => 
+                              req.positionID === employee.positionID && 
+                              req.competencyID === competency.competencyID
+                            );
+                            
+                            if (isRequired) {
+                              domainAssignedCount++;
+                              
+                              const employeeAssessments = assessments.filter(assessment => 
+                                assessment.employeeID === employee.employeeID && 
+                                assessment.status === 'Completed'
+                              );
+                              
+                              if (employeeAssessments.length > 0) {
+                                const latestAssessment = employeeAssessments.sort((a, b) => 
+                                  new Date(b.assessmentDate).getTime() - new Date(a.assessmentDate).getTime()
+                                )[0];
+                                
+                                const requirement = positionRequirements.find(req => 
+                                  req.positionID === employee.positionID && 
+                                  req.competencyID === competency.competencyID
+                                );
+                                
+                                if (requirement) {
+                                  const score = competencyScores.find(s => 
+                                    s.assessmentID === latestAssessment.assessmentID && 
+                                    s.competencyID === competency.competencyID
+                                  );
+                                  
+                                  if (score && score.currentLevel >= requirement.requiredLevel) {
+                                    domainAchievedCount++;
+                                  }
+                                }
+                              }
+                            }
+                          });
+                        });
+                      });
+                      
+                      const domainProgressPercentage = domainAssignedCount > 0 ? (domainAchievedCount / domainAssignedCount) * 100 : 0;
+                      
+                      return (
+                        <div key={domainName} className="border border-gray-200 rounded-lg overflow-hidden">
+                          {/* Domain Header */}
+                          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                            <div className="flex items-center justify-between">
+                              <button
+                                onClick={() => toggleDomain(domainName)}
+                                className="flex items-center text-left font-bold hover:bg-gray-100 transition-colors rounded px-2 py-1 -ml-2 flex-1"
+                              >
+                                <span className="text-lg font-mono text-gray-600 mr-2 min-w-[20px]">
+                                  {isDomainExpanded ? '-' : '+'}
+                                </span>
+                                <h5 className="font-bold text-gray-900 text-lg">{domainName}</h5>
+                              </button>
+                              
+                              {/* Domain Progress Bar */}
+                              <div className="flex items-center space-x-3 min-w-[250px] ml-4">
+                                <div className="flex-1 bg-gray-200 rounded-full h-3 min-w-[150px]">
+                                  <div 
+                                    className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                                    style={{ width: `${domainProgressPercentage}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-xs text-gray-500 min-w-[50px] text-right">
+                                  {domainAchievedCount}/{domainAssignedCount}
+                                </span>
+                                <span className="text-xs font-medium text-blue-600 min-w-[40px] text-right">
+                                  {Math.round(domainProgressPercentage)}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Categories and Competencies - Only show if domain is expanded */}
+                          {isDomainExpanded && (
+                            <>
+                              {Object.entries(categoryGroups).map(([categoryName, categoryCompetencies]) => {
+                                const categoryKey = `${domainName}-${categoryName}`;
+                                const isCategoryExpanded = expandedCategories.has(categoryKey);
+                                
+                                // Calculate category-level progress
+                                let categoryAssignedCount = 0;
+                                let categoryAchievedCount = 0;
+                                
+                                categoryCompetencies.forEach(competency => {
+                                  filteredEmployees.forEach(employee => {
+                                    const isRequired = positionRequirements.some(req => 
+                                      req.positionID === employee.positionID && 
+                                      req.competencyID === competency.competencyID
+                                    );
+                                    
+                                    if (isRequired) {
+                                      categoryAssignedCount++;
+                                      
+                                      const employeeAssessments = assessments.filter(assessment => 
+                                        assessment.employeeID === employee.employeeID && 
+                                        assessment.status === 'Completed'
+                                      );
+                                      
+                                      if (employeeAssessments.length > 0) {
+                                        const latestAssessment = employeeAssessments.sort((a, b) => 
+                                          new Date(b.assessmentDate).getTime() - new Date(a.assessmentDate).getTime()
+                                        )[0];
+                                        
+                                        const requirement = positionRequirements.find(req => 
+                                          req.positionID === employee.positionID && 
+                                          req.competencyID === competency.competencyID
+                                        );
+                                        
+                                        if (requirement) {
+                                          const score = competencyScores.find(s => 
+                                            s.assessmentID === latestAssessment.assessmentID && 
+                                            s.competencyID === competency.competencyID
+                                          );
+                                          
+                                          if (score && score.currentLevel >= requirement.requiredLevel) {
+                                            categoryAchievedCount++;
+                                          }
+                                        }
+                                      }
+                                    }
+                                  });
+                                });
+                                
+                                const categoryProgressPercentage = categoryAssignedCount > 0 ? (categoryAchievedCount / categoryAssignedCount) * 100 : 0;
+                                
+                                return (
+                                  <div key={categoryName} className="border-b border-gray-100 last:border-b-0">
+                                    {/* Category Header */}
+                                    <div className="bg-gray-25 px-4 py-2 border-b border-gray-100">
+                                      <div className="flex items-center justify-between">
+                                        <button
+                                          onClick={() => toggleCategory(categoryKey)}
+                                          className="flex items-center text-left hover:bg-gray-50 transition-colors rounded px-2 py-1 -ml-2 flex-1"
+                                        >
+                                          <span className="text-lg font-mono text-gray-600 mr-2 min-w-[20px]">
+                                            {isCategoryExpanded ? '-' : '+'}
+                                          </span>
+                                          <h6 className="font-medium text-gray-700 text-sm">{categoryName}</h6>
+                                        </button>
+                                        
+                                        {/* Category Progress Bar */}
+                                        <div className="flex items-center space-x-3 min-w-[250px] ml-4">
+                                          <div className="flex-1 bg-gray-200 rounded-full h-3 min-w-[150px]">
+                                            <div 
+                                              className="bg-green-600 h-3 rounded-full transition-all duration-300"
+                                              style={{ width: `${categoryProgressPercentage}%` }}
+                                            ></div>
+                                          </div>
+                                          <span className="text-xs text-gray-500 min-w-[50px] text-right">
+                                            {categoryAchievedCount}/{categoryAssignedCount}
+                                          </span>
+                                          <span className="text-xs font-medium text-green-600 min-w-[40px] text-right">
+                                            {Math.round(categoryProgressPercentage)}%
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Competencies - Only show if category is expanded */}
+                                    {isCategoryExpanded && (
+                                      <div className="px-4 py-2 space-y-2">
+                                        {categoryCompetencies
+                                          .map((competency) => {
+                                            // Calculate progress for this competency based on filtered employees
+                                            let assignedCount = 0;
+                                            let achievedCount = 0;
+                                            
+                                            filteredEmployees.forEach(employee => {
+                                              // Check if this competency is required for the employee's position
+                                              const isRequired = positionRequirements.some(req => 
+                                                req.positionID === employee.positionID && 
+                                                req.competencyID === competency.competencyID
+                                              );
+                                              
+                                              if (isRequired) {
+                                                assignedCount++;
+                                                
+                                                // Check if achieved
+                                                const employeeAssessments = assessments.filter(assessment => 
+                                                  assessment.employeeID === employee.employeeID && 
+                                                  assessment.status === 'Completed'
+                                                );
+                                                
+                                                if (employeeAssessments.length > 0) {
+                                                  const latestAssessment = employeeAssessments.sort((a, b) => 
+                                                    new Date(b.assessmentDate).getTime() - new Date(a.assessmentDate).getTime()
+                                                  )[0];
+                                                  
+                                                  const requirement = positionRequirements.find(req => 
+                                                    req.positionID === employee.positionID && 
+                                                    req.competencyID === competency.competencyID
+                                                  );
+                                                  
+                                                  if (requirement) {
+                                                    const score = competencyScores.find(s => 
+                                                      s.assessmentID === latestAssessment.assessmentID && 
+                                                      s.competencyID === competency.competencyID
+                                                    );
+                                                    
+                                                    if (score && score.currentLevel >= requirement.requiredLevel) {
+                                                      achievedCount++;
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            });
+                                            
+                                            return { competency, assignedCount, achievedCount };
+                                          })
+                                          .filter(({ assignedCount }) => assignedCount > 0) // Hide competencies with 0 assigned
+                                          .map(({ competency, assignedCount, achievedCount }) => {
+                                            const progressPercentage = assignedCount > 0 ? (achievedCount / assignedCount) * 100 : 0;
+                                            
+                                            return (
+                                              <div key={competency.competencyID} className="flex items-center justify-between py-1">
+                                                <div className="flex-1 min-w-0 text-left">
+                                                  <div className="text-sm text-gray-900">{competency.competencyName}</div>
+                                                </div>
+                                                
+                                                {/* Competency Progress Bar - Right Side */}
+                                                <div className="flex items-center space-x-3 min-w-[250px] ml-4">
+                                                  <div className="flex-1 bg-gray-200 rounded-full h-3 min-w-[150px]">
+                                                    <div 
+                                                      className="bg-purple-600 h-3 rounded-full transition-all duration-300"
+                                                      style={{ width: `${progressPercentage}%` }}
+                                                    ></div>
+                                                  </div>
+                                                  <span className="text-xs text-gray-500 min-w-[50px] text-right">
+                                                    {achievedCount}/{assignedCount}
+                                                  </span>
+                                                  <span className="text-xs font-medium text-purple-600 min-w-[40px] text-right">
+                                                    {Math.round(progressPercentage)}%
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+           </div>
+         </div>
       </div>
     </div>
   );
