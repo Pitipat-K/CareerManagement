@@ -1,22 +1,80 @@
 import { Link } from 'react-router-dom';
 import { Building2, Users, Briefcase, MapPin, Upload } from 'lucide-react';
+import { getUserEmail, getOktaUser, getCurrentEmployee, debugAuthData } from '../utils/auth';
+import Header from '../components/Header';
 
 const Home = () => {
   // Check if a user is logged in
   const currentEmployee = localStorage.getItem('currentEmployee');
   const isLoggedIn = !!currentEmployee;
+  
+  // Get user data using utility functions
+  const userEmail = getUserEmail();
+  const oktaUserData = getOktaUser();
+  const employeeData = getCurrentEmployee();
+  
+  // Debug: Log what's in localStorage
+  console.log('=== HOME PAGE DEBUG ===');
+  console.log('userEmail from getUserEmail():', userEmail);
+  console.log('oktaUserData:', oktaUserData);
+  console.log('employeeData:', employeeData);
+  
+  // Use the debug utility function
+  debugAuthData();
+  
+  // Check if employee matching was successful
+  if (employeeData && employeeData.employeeID) {
+    console.log('✅ Employee matching successful!');
+    console.log('EmployeeID:', employeeData.employeeID);
+    console.log('Employee Name:', employeeData.firstName, employeeData.lastName);
+    console.log('Employee Email:', employeeData.email);
+  } else {
+    console.warn('⚠️ Employee matching may have failed or using default employee');
+  }
+  console.log('========================');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <Header showUserInfo={true} />
+      
       <div className="w-full px-4 py-6 sm:py-8 lg:py-12">
-        <header className="text-center mb-8 sm:mb-12">
+        <div className="text-center mb-8 sm:mb-12">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 sm:mb-4">
-            Career Management System
+            Welcome to Your Career Portal
           </h1>
-          <p className="text-lg sm:text-xl lg:text-2xl text-gray-600 max-w-4xl mx-auto px-4">
-            Alliance Laundry Thailand
+          <p className="text-lg sm:text-xl text-gray-600 max-w-4xl mx-auto px-4">
+            Manage your professional development and explore career opportunities
           </p>
-        </header>
+          
+          {/* Debug User Info Section - Only show in development */}
+          {process.env.NODE_ENV === 'development' && isLoggedIn && (
+            <div className="mt-6 bg-white rounded-lg shadow-md p-4 max-w-md mx-auto">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Debug Info</h3>
+              <div className="space-y-1 text-sm text-gray-600">
+                {userEmail && (
+                  <div className="mb-2 p-2 bg-blue-50 rounded border-l-4 border-blue-500">
+                    <p><strong>User Email:</strong> {userEmail}</p>
+                  </div>
+                )}
+                {oktaUserData && (
+                  <div>
+                    <p><strong>Okta Name:</strong> {oktaUserData.name || 'Not available'}</p>
+                    <p><strong>Okta ID:</strong> {oktaUserData.sub || 'Not available'}</p>
+                  </div>
+                )}
+                {employeeData && (
+                  <div>
+                    <p><strong>Employee ID:</strong> {employeeData.employeeID}</p>
+                    <p><strong>Employee:</strong> {employeeData.firstName} {employeeData.lastName}</p>
+                    <p><strong>Position:</strong> {employeeData.positionTitle}</p>
+                    <p><strong>Department:</strong> {employeeData.departmentName}</p>
+                    <p><strong>Employee Email:</strong> {employeeData.email || 'Not set'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="max-w-7xl mx-auto">
           <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 lg:p-12">

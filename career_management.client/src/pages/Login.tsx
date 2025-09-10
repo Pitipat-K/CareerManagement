@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Building2, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { User, Building2, ArrowRight, Shield } from 'lucide-react';
+import { useOktaAuth } from '@okta/okta-react';
 import { getApiUrl } from '../config/api';
 
 const Login = () => {
@@ -8,6 +9,48 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { oktaAuth, authState } = useOktaAuth();
+
+  // Check for error parameters from callback
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'employee_not_found') {
+      setError('Your account was not found in our employee system. Please contact HR.');
+    } else if (errorParam === 'auth_failed') {
+      setError('Authentication failed. Please try again.');
+    } else if (errorParam === 'no_email_found') {
+      setError('No email found in your user profile. Please contact IT support.');
+    } else if (errorParam === 'no_user_info') {
+      setError('Failed to retrieve user information. Please try again.');
+    } else if (errorParam === 'token_exchange_failed') {
+      setError('Token exchange failed. Please try again.');
+    } else if (errorParam === 'redirect_failed') {
+      setError('Failed to complete authentication redirect. Please try again.');
+    } else if (errorParam === 'process_failed') {
+      setError('Authentication process failed. Please try again.');
+    } else if (errorParam === 'timeout') {
+      setError('Authentication timeout. Please try again.');
+    }
+  }, [searchParams]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (authState?.isAuthenticated) {
+      navigate('/home');
+    }
+  }, [authState, navigate]);
+
+  const handleOktaLogin = async () => {
+    setLoading(true);
+    try {
+      await oktaAuth.signInWithRedirect();
+    } catch (error) {
+      console.error('Okta login error:', error);
+      setError('Failed to initiate login. Please try again.');
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +173,26 @@ const Login = () => {
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </>
               )}
+            </button>
+
+            {/* Okta SSO Button */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOktaLogin}
+              disabled={loading}
+              className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-lg font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Shield className="w-5 h-5 mr-2 text-blue-600" />
+              Sign in with SSO
             </button>
           </form>
 

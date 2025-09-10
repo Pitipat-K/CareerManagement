@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Download, Info } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Download, Info, LogOut } from 'lucide-react';
+import { useOktaAuth } from '@okta/okta-react';
+import { clearAuthData } from '../utils/auth';
 import { getApiUrl } from '../config/api';
 
 interface ImportResult {
@@ -22,6 +24,20 @@ const ImportData = () => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [loadingPositions, setLoadingPositions] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const { oktaAuth } = useOktaAuth();
+
+  const handleLogout = async () => {
+    try {
+      clearAuthData();
+      await oktaAuth.signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      clearAuthData();
+      navigate('/login');
+    }
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -146,6 +162,16 @@ const ImportData = () => {
               Import Data
             </h1>
           </div>
+          
+          {/* Logout button */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors duration-200"
+            title="Sign out"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Sign out</span>
+          </button>
         </div>
       </header>
 

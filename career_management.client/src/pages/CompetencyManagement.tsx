@@ -1,6 +1,9 @@
 import { Routes, Route, NavLink, Link } from 'react-router-dom';
 import { useState } from 'react';
-import { ArrowLeft, Target, FolderOpen, Globe, Users, Menu, X, Package, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Target, FolderOpen, Globe, Users, Menu, X, Package, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useOktaAuth } from '@okta/okta-react';
+import { clearAuthData } from '../utils/auth';
 import Competencies from '../components/Competencies';
 import CompetencyCategories from '../components/CompetencyCategories';
 import CompetencyDomains from '../components/CompetencyDomains';
@@ -10,6 +13,20 @@ import CompetencySets from '../components/CompetencySets';
 const CompetencyManagement = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const { oktaAuth } = useOktaAuth();
+
+  const handleLogout = async () => {
+    try {
+      clearAuthData();
+      await oktaAuth.signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      clearAuthData();
+      navigate('/login');
+    }
+  };
 
   const menuItems = [
     { path: 'competencies', label: 'Competencies', icon: Target },
@@ -43,6 +60,16 @@ const CompetencyManagement = () => {
               Competency Management
             </h1>
           </div>
+          
+          {/* Logout button */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors duration-200"
+            title="Sign out"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Sign out</span>
+          </button>
         </div>
       </header>
 

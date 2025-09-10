@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Career_Management.Server.Data;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +25,28 @@ builder.Services.AddHttpClient();
 
 // Add Notification Service
 builder.Services.AddScoped<Career_Management.Server.Services.NotificationService>();
+
+// Add Okta Authentication
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.Authority = builder.Configuration["Okta:Issuer"];
+    options.Audience = builder.Configuration["Okta:Audience"];
+    options.RequireHttpsMetadata = false; // Set to true in production
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Okta:Issuer"],
+        ValidAudience = builder.Configuration["Okta:Audience"]
+    };
+});
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -68,6 +93,8 @@ app.UseHttpsRedirection();
 // Use CORS
 app.UseCors("AllowReactApp");
 
+// Add authentication middleware
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
