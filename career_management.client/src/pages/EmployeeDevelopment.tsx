@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Link } from 'react-router-dom';
 import { User, ClipboardList, ArrowLeft, Menu, X, LogOut, PieChart, TrendingUp, Map, ChevronLeft, ChevronRight, Building } from 'lucide-react';
 import { useOktaAuth } from '@okta/okta-react';
 import EmployeeProfile from '../components/EmployeeProfile';
@@ -10,7 +10,9 @@ import CareerNavigator from '../components/CareerNavigator';
 import CareerPath from '../components/CareerPath';
 import OrganizationCompetency from '../components/OrganizationCompetency';
 import { getApiUrl } from '../config/api';
-import { getCurrentEmployee, getUserEmail, clearAuthData } from '../utils/auth';
+import { getCurrentEmployee, getUserEmail } from '../utils/auth';
+import { usePermissionContext } from '../contexts/PermissionContext';
+import { performLogout } from '../utils/logout';
 
 interface Employee {
   employeeID: number;
@@ -47,7 +49,6 @@ const EmployeeDevelopment = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
   const { oktaAuth } = useOktaAuth();
 
   const menuItems = [
@@ -115,16 +116,10 @@ const EmployeeDevelopment = () => {
     }
   };
 
+  const { clearPermissions } = usePermissionContext();
+
   const handleLogout = async () => {
-    try {
-      clearAuthData();
-      await oktaAuth.signOut();
-      navigate('/login');
-    } catch (error) {
-      console.error('Error during logout:', error);
-      clearAuthData();
-      navigate('/login');
-    }
+    await performLogout(oktaAuth, clearPermissions);
   };
 
   if (!employeeId) {

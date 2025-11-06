@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit, Trash2, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
+import { useModulePermissions } from '../hooks/usePermissions';
 
 interface Company {
     companyID: number;
@@ -28,7 +29,11 @@ interface CompanyFormData {
     directorID: string;
 }
 
+type SortField = 'companyName';
+type SortDirection = 'asc' | 'desc';
+
 const Companies = () => {
+    const { canCreate, canRead, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('COMPANIES');
     const [companies, setCompanies] = useState<Company[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
@@ -36,17 +41,59 @@ const Companies = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingCompany, setEditingCompany] = useState<Company | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [sortField, setSortField] = useState<SortField>('companyName');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
     const [formData, setFormData] = useState<CompanyFormData>({
         companyName: '',
         description: '',
         directorID: ''
     });
     const [errors, setErrors] = useState<Partial<CompanyFormData>>({});
+    
+    // Column filters state
+    const [columnFilters, setColumnFilters] = useState<{
+        companyName: string[];
+    }>({
+        companyName: []
+    });
+    
+    // Temp filters for the dropdown (before Apply is clicked)
+    const [tempFilters, setTempFilters] = useState<{
+        companyName: string[];
+    }>({
+        companyName: []
+    });
+    
+    // Track which filter dropdown is open
+    const [openFilter, setOpenFilter] = useState<string | null>(null);
+    const filterRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+    
+    // Search term within filter dropdowns
+    const [filterSearchTerm, setFilterSearchTerm] = useState<string>('');
 
     useEffect(() => {
-        fetchCompanies();
-        fetchEmployees();
-    }, []);
+        if (canRead) {
+            fetchCompanies();
+            fetchEmployees();
+        }
+    }, [canRead]);
+
+    // Close filter dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (openFilter) {
+                const filterElement = filterRefs.current[openFilter];
+                if (filterElement && !filterElement.contains(event.target as Node)) {
+                    setOpenFilter(null);
+                    setTempFilters({ ...columnFilters });
+                    setFilterSearchTerm('');
+                }
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [openFilter, columnFilters]);
 
     const getCurrentEmployeeId = (): number | null => {
         try {
@@ -82,6 +129,11 @@ const Companies = () => {
     };
 
     const handleDelete = async (id: number) => {
+        if (!canDelete) {
+            alert('You do not have permission to delete companies.');
+            return;
+        }
+        
         if (window.confirm('Are you sure you want to delete this company?')) {
             try {
                 const currentEmployeeId = getCurrentEmployeeId();
@@ -120,6 +172,17 @@ const Companies = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Check permissions before allowing submit
+        if (editingCompany && !canUpdate) {
+            alert('You do not have permission to update companies.');
+            return;
+        }
+        
+        if (!editingCompany && !canCreate) {
+            alert('You do not have permission to create companies.');
+            return;
+        }
 
         if (!validateForm()) {
             return;
@@ -198,10 +261,234 @@ const Companies = () => {
         setShowModal(true);
     };
 
-    const filteredCompanies = companies.filter(company =>
-        company.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        company.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
+    const getSortIcon = (field: SortField) => {
+        if (sortField !== field) {
+            return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+        }
+        return sortDirection === 'asc' 
+            ? <ArrowUp className="w-4 h-4 text-blue-600" />
+            : <ArrowDown className="w-4 h-4 text-blue-600" />;
+    };
+
+    // Get unique values for a column
+    const getUniqueColumnValues = (field: keyof typeof columnFilters): string[] => {
+        const values = companies
+            .map(comp => comp[field] || '-')
+            .filter((value, index, self) => self.indexOf(value) === index)
+            .sort();
+        return values;
+    };
+
+    // Toggle filter dropdown
+    const toggleFilterDropdown = (field: string) => {
+        if (openFilter === field) {
+            setOpenFilter(null);
+            setTempFilters({ ...columnFilters });
+            setFilterSearchTerm('');
+        } else {
+            setOpenFilter(field);
+            setTempFilters({ ...columnFilters });
+            setFilterSearchTerm('');
+        }
+    };
+
+    // Handle checkbox change in filter
+    const handleFilterCheckbox = (field: keyof typeof columnFilters, value: string) => {
+        setTempFilters(prev => {
+            const currentValues = prev[field];
+            if (currentValues.includes(value)) {
+                return {
+                    ...prev,
+                    [field]: currentValues.filter(v => v !== value)
+                };
+            } else {
+                return {
+                    ...prev,
+                    [field]: [...currentValues, value]
+                };
+            }
+        });
+    };
+
+    // Apply filter
+    const applyFilter = (field: keyof typeof columnFilters) => {
+        setColumnFilters(prev => ({
+            ...prev,
+            [field]: tempFilters[field]
+        }));
+        setOpenFilter(null);
+        setFilterSearchTerm('');
+    };
+
+    // Clear filter
+    const clearFilter = (field: keyof typeof columnFilters) => {
+        setTempFilters(prev => ({
+            ...prev,
+            [field]: []
+        }));
+        setColumnFilters(prev => ({
+            ...prev,
+            [field]: []
+        }));
+        setOpenFilter(null);
+        setFilterSearchTerm('');
+    };
+
+    // Check if column has active filter
+    const hasActiveFilter = (field: keyof typeof columnFilters): boolean => {
+        return columnFilters[field].length > 0;
+    };
+
+    // Render filter dropdown
+    const renderFilterDropdown = (field: keyof typeof columnFilters) => {
+        const uniqueValues = getUniqueColumnValues(field);
+        const isOpen = openFilter === field;
+        
+        // Filter values based on search term
+        const filteredValues = uniqueValues.filter(value => 
+            value.toLowerCase().includes(filterSearchTerm.toLowerCase())
+        );
+
+        // Calculate dropdown position for fixed positioning
+        const getDropdownStyle = (): React.CSSProperties => {
+            if (!isOpen || !filterRefs.current[field]) return {};
+            
+            const buttonElement = filterRefs.current[field];
+            const rect = buttonElement?.getBoundingClientRect();
+            
+            if (!rect) return {};
+            
+            return {
+                position: 'fixed',
+                top: `${rect.bottom + 4}px`,
+                left: `${rect.left}px`,
+                zIndex: 9999
+            };
+        };
+
+        return (
+            <div className="relative inline-block" ref={el => filterRefs.current[field] = el}>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFilterDropdown(field);
+                    }}
+                    className={`ml-2 p-1 rounded hover:bg-gray-200 ${hasActiveFilter(field) ? 'text-blue-600' : 'text-gray-400'}`}
+                >
+                    <Filter className="w-4 h-4" />
+                </button>
+                
+                {isOpen && (
+                    <div 
+                        style={getDropdownStyle()}
+                        className="bg-white border border-gray-300 rounded-lg shadow-lg min-w-[200px] max-w-[300px]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-3 border-b border-gray-200">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={filterSearchTerm}
+                                    onChange={(e) => setFilterSearchTerm(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="p-3 max-h-[250px] overflow-y-auto">
+                            <div className="space-y-2">
+                                {filteredValues.length > 0 ? (
+                                    filteredValues.map((value) => (
+                                        <label key={value} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                            <input
+                                                type="checkbox"
+                                                checked={tempFilters[field].includes(value)}
+                                                onChange={() => handleFilterCheckbox(field, value)}
+                                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                            />
+                                            <span className="text-sm text-gray-700 truncate">{value}</span>
+                                        </label>
+                                    ))
+                                ) : (
+                                    <div className="text-sm text-gray-500 text-center py-2">
+                                        No results found
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between gap-2 p-3 border-t border-gray-200">
+                            <button
+                                onClick={() => clearFilter(field)}
+                                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                            >
+                                Clear
+                            </button>
+                            <button
+                                onClick={() => applyFilter(field)}
+                                className="px-3 py-1.5 text-sm text-white bg-cyan-500 rounded hover:bg-cyan-600 transition-colors"
+                            >
+                                Apply
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const filteredCompanies = companies
+        .filter(company => {
+            // Global search filter
+            const matchesSearch = searchTerm === '' || 
+                company.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                company.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            // Column filters
+            const matchesCompanyName = columnFilters.companyName.length === 0 || 
+                columnFilters.companyName.includes(company.companyName || '-');
+
+            return matchesSearch && matchesCompanyName;
+        })
+        .sort((a, b) => {
+            const aValue = a[sortField] || '';
+            const bValue = b[sortField] || '';
+            const comparison = aValue.toString().localeCompare(bValue.toString());
+            return sortDirection === 'asc' ? comparison : -comparison;
+        });
+
+    // Show loading state for permissions
+    if (permissionsLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-lg text-gray-600">Loading permissions...</div>
+            </div>
+        );
+    }
+
+    // Check if user has any permission to access this module
+    if (!hasAnyPermission) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                    <div className="text-lg text-red-600 mb-2">Access Denied</div>
+                    <div className="text-gray-600">You do not have permission to access Company Management.</div>
+                </div>
+            </div>
+        );
+    }
 
     if (loading) {
         return (
@@ -215,13 +502,15 @@ const Companies = () => {
         <div className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Companies</h2>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto"
-                >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Company</span>
-                </button>
+                {canCreate && (
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto"
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>Add Company</span>
+                    </button>
+                )}
             </div>
 
             <div className="relative">
@@ -246,18 +535,22 @@ const Companies = () => {
                                     <p className="text-sm text-gray-500">{company.description || 'No description'}</p>
                                 </div>
                                 <div className="flex space-x-2 ml-4">
-                                    <button
-                                        onClick={() => handleEditCompany(company)}
-                                        className="text-blue-600 hover:text-blue-900 p-1"
-                                    >
-                                        <Edit className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(company.companyID)}
-                                        className="text-red-600 hover:text-red-900 p-1"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    {canUpdate && (
+                                        <button
+                                            onClick={() => handleEditCompany(company)}
+                                            className="text-blue-600 hover:text-blue-900 p-1"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    {canDelete && (
+                                        <button
+                                            onClick={() => handleDelete(company.companyID)}
+                                            className="text-red-600 hover:text-red-900 p-1"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -286,8 +579,19 @@ const Companies = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50 sticky top-0 z-10">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                                    Company Name
+                                <th 
+                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div 
+                                            className="flex items-center space-x-1 cursor-pointer hover:text-gray-700 select-none"
+                                            onClick={() => handleSort('companyName')}
+                                        >
+                                            <span>Company Name</span>
+                                            {getSortIcon('companyName')}
+                                        </div>
+                                        {renderFilterDropdown('companyName')}
+                                    </div>
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                     Description
@@ -326,18 +630,22 @@ const Companies = () => {
                                     </td>
                                     <td className="px-2 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex space-x-1">
-                                            <button
-                                                onClick={() => handleEditCompany(company)}
-                                                className="text-blue-600 hover:text-blue-900 p-1"
-                                            >
-                                                <Edit className="w-3 h-3" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(company.companyID)}
-                                                className="text-red-600 hover:text-red-900 p-1"
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
+                                            {canUpdate && (
+                                                <button
+                                                    onClick={() => handleEditCompany(company)}
+                                                    className="text-blue-600 hover:text-blue-900 p-1"
+                                                >
+                                                    <Edit className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                            {canDelete && (
+                                                <button
+                                                    onClick={() => handleDelete(company.companyID)}
+                                                    className="text-red-600 hover:text-red-900 p-1"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

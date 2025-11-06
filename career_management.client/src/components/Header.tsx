@@ -1,7 +1,8 @@
-import { useNavigate } from 'react-router-dom';
 import { useOktaAuth } from '@okta/okta-react';
 import { LogOut, User, Building2 } from 'lucide-react';
-import { getUserEmail, getCurrentEmployee, clearAuthData } from '../utils/auth';
+import { getUserEmail, getCurrentEmployee } from '../utils/auth';
+import { usePermissionContext } from '../contexts/PermissionContext';
+import { performLogout } from '../utils/logout';
 
 interface HeaderProps {
   title?: string;
@@ -14,27 +15,13 @@ const Header = ({
   subtitle = "Alliance Laundry Thailand",
   showUserInfo = false 
 }: HeaderProps) => {
-  const navigate = useNavigate();
   const { oktaAuth } = useOktaAuth();
+  const { clearPermissions } = usePermissionContext();
   const userEmail = getUserEmail();
   const employeeData = getCurrentEmployee();
 
   const handleLogout = async () => {
-    try {
-      // Clear local storage
-      clearAuthData();
-      
-      // Sign out from Okta
-      await oktaAuth.signOut();
-      
-      // Navigate to login page
-      navigate('/login');
-    } catch (error) {
-      console.error('Error during logout:', error);
-      // Even if Okta signout fails, clear local data and redirect
-      clearAuthData();
-      navigate('/login');
-    }
+    await performLogout(oktaAuth, clearPermissions);
   };
 
   return (

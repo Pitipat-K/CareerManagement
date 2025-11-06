@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit, Trash2, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
 
@@ -35,6 +35,9 @@ interface DepartmentFormData {
   managerID: string;
 }
 
+type SortField = 'departmentName' | 'companyName';
+type SortDirection = 'asc' | 'desc';
+
 const Departments = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -44,6 +47,8 @@ const Departments = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('departmentName');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [formData, setFormData] = useState<DepartmentFormData>({
     departmentName: '',
     description: '',
@@ -51,12 +56,54 @@ const Departments = () => {
     managerID: ''
   });
   const [errors, setErrors] = useState<Partial<DepartmentFormData>>({});
+  
+  // Column filters state
+  const [columnFilters, setColumnFilters] = useState<{
+    departmentName: string[];
+    companyName: string[];
+  }>({
+    departmentName: [],
+    companyName: []
+  });
+  
+  // Temp filters for the dropdown (before Apply is clicked)
+  const [tempFilters, setTempFilters] = useState<{
+    departmentName: string[];
+    companyName: string[];
+  }>({
+    departmentName: [],
+    companyName: []
+  });
+  
+  // Track which filter dropdown is open
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const filterRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  
+  // Search term within filter dropdowns
+  const [filterSearchTerm, setFilterSearchTerm] = useState<string>('');
 
   useEffect(() => {
     fetchDepartments();
     fetchCompanies();
     fetchEmployees();
   }, []);
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openFilter) {
+        const filterElement = filterRefs.current[openFilter];
+        if (filterElement && !filterElement.contains(event.target as Node)) {
+          setOpenFilter(null);
+          setTempFilters({ ...columnFilters });
+          setFilterSearchTerm('');
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openFilter, columnFilters]);
 
   const getCurrentEmployeeId = (): number | null => {
     try {
@@ -225,11 +272,217 @@ const Departments = () => {
     setShowModal(true);
   };
 
-  const filteredDepartments = departments.filter(department =>
-    department.departmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    department.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    department.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 text-blue-600" />
+      : <ArrowDown className="w-4 h-4 text-blue-600" />;
+  };
+
+  // Get unique values for a column
+  const getUniqueColumnValues = (field: keyof typeof columnFilters): string[] => {
+    const values = departments
+      .map(dept => dept[field] || '-')
+      .filter((value, index, self) => self.indexOf(value) === index)
+      .sort();
+    return values;
+  };
+
+  // Toggle filter dropdown
+  const toggleFilterDropdown = (field: string) => {
+    if (openFilter === field) {
+      setOpenFilter(null);
+      setTempFilters({ ...columnFilters });
+      setFilterSearchTerm('');
+    } else {
+      setOpenFilter(field);
+      setTempFilters({ ...columnFilters });
+      setFilterSearchTerm('');
+    }
+  };
+
+  // Handle checkbox change in filter
+  const handleFilterCheckbox = (field: keyof typeof columnFilters, value: string) => {
+    setTempFilters(prev => {
+      const currentValues = prev[field];
+      if (currentValues.includes(value)) {
+        return {
+          ...prev,
+          [field]: currentValues.filter(v => v !== value)
+        };
+      } else {
+        return {
+          ...prev,
+          [field]: [...currentValues, value]
+        };
+      }
+    });
+  };
+
+  // Apply filter
+  const applyFilter = (field: keyof typeof columnFilters) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [field]: tempFilters[field]
+    }));
+    setOpenFilter(null);
+    setFilterSearchTerm('');
+  };
+
+  // Clear filter
+  const clearFilter = (field: keyof typeof columnFilters) => {
+    setTempFilters(prev => ({
+      ...prev,
+      [field]: []
+    }));
+    setColumnFilters(prev => ({
+      ...prev,
+      [field]: []
+    }));
+    setOpenFilter(null);
+    setFilterSearchTerm('');
+  };
+
+  // Check if column has active filter
+  const hasActiveFilter = (field: keyof typeof columnFilters): boolean => {
+    return columnFilters[field].length > 0;
+  };
+
+  // Render filter dropdown
+  const renderFilterDropdown = (field: keyof typeof columnFilters) => {
+    const uniqueValues = getUniqueColumnValues(field);
+    const isOpen = openFilter === field;
+    
+    // Filter values based on search term
+    const filteredValues = uniqueValues.filter(value => 
+      value.toLowerCase().includes(filterSearchTerm.toLowerCase())
+    );
+
+    // Calculate dropdown position for fixed positioning
+    const getDropdownStyle = (): React.CSSProperties => {
+      if (!isOpen || !filterRefs.current[field]) return {};
+      
+      const buttonElement = filterRefs.current[field];
+      const rect = buttonElement?.getBoundingClientRect();
+      
+      if (!rect) return {};
+      
+      return {
+        position: 'fixed',
+        top: `${rect.bottom + 4}px`,
+        left: `${rect.left}px`,
+        zIndex: 9999
+      };
+    };
+
+    return (
+      <div className="relative inline-block" ref={el => filterRefs.current[field] = el}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleFilterDropdown(field);
+          }}
+          className={`ml-2 p-1 rounded hover:bg-gray-200 ${hasActiveFilter(field) ? 'text-blue-600' : 'text-gray-400'}`}
+        >
+          <Filter className="w-4 h-4" />
+        </button>
+        
+        {isOpen && (
+          <div 
+            style={getDropdownStyle()}
+            className="bg-white border border-gray-300 rounded-lg shadow-lg min-w-[200px] max-w-[300px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-3 border-b border-gray-200">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={filterSearchTerm}
+                  onChange={(e) => setFilterSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+            
+            <div className="p-3 max-h-[250px] overflow-y-auto">
+              <div className="space-y-2">
+                {filteredValues.length > 0 ? (
+                  filteredValues.map((value) => (
+                    <label key={value} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={tempFilters[field].includes(value)}
+                        onChange={() => handleFilterCheckbox(field, value)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 truncate">{value}</span>
+                    </label>
+                  ))
+                ) : (
+                  <div className="text-sm text-gray-500 text-center py-2">
+                    No results found
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between gap-2 p-3 border-t border-gray-200">
+              <button
+                onClick={() => clearFilter(field)}
+                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => applyFilter(field)}
+                className="px-3 py-1.5 text-sm text-white bg-cyan-500 rounded hover:bg-cyan-600 transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const filteredDepartments = departments
+    .filter(department => {
+      // Global search filter
+      const matchesSearch = searchTerm === '' || 
+        department.departmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        department.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        department.companyName?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Column filters
+      const matchesDepartmentName = columnFilters.departmentName.length === 0 || 
+        columnFilters.departmentName.includes(department.departmentName || '-');
+      
+      const matchesCompanyName = columnFilters.companyName.length === 0 || 
+        columnFilters.companyName.includes(department.companyName || '-');
+
+      return matchesSearch && matchesDepartmentName && matchesCompanyName;
+    })
+    .sort((a, b) => {
+      const aValue = a[sortField] || '';
+      const bValue = b[sortField] || '';
+      const comparison = aValue.toString().localeCompare(bValue.toString());
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
 
   if (loading) {
     return (
@@ -314,11 +567,33 @@ const Departments = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                  Department Name
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div 
+                      className="flex items-center space-x-1 cursor-pointer hover:text-gray-700 select-none"
+                      onClick={() => handleSort('departmentName')}
+                    >
+                      <span>Department Name</span>
+                      {getSortIcon('departmentName')}
+                    </div>
+                    {renderFilterDropdown('departmentName')}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                  Company
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div 
+                      className="flex items-center space-x-1 cursor-pointer hover:text-gray-700 select-none"
+                      onClick={() => handleSort('companyName')}
+                    >
+                      <span>Company</span>
+                      {getSortIcon('companyName')}
+                    </div>
+                    {renderFilterDropdown('companyName')}
+                  </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Description

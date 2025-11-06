@@ -6,6 +6,7 @@ namespace Career_Management.Server.Models.DTOs
         public int SetID { get; set; }
         public int CompetencyID { get; set; }
         public string CompetencyName { get; set; } = string.Empty;
+        public string CompetencyDescription { get; set; } = string.Empty;
         public string? CategoryName { get; set; }
         public string? DomainName { get; set; }
         public int RequiredLevel { get; set; }

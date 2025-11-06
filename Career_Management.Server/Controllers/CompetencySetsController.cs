@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Career_Management.Server.Data;
 using Career_Management.Server.Models;
 using Career_Management.Server.Models.DTOs;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Career_Management.Server.Controllers
 {
@@ -16,6 +18,132 @@ namespace Career_Management.Server.Controllers
         {
             _context = context;
         }
+
+        #region Helper Methods
+
+        // Calculate hash for a competency set to detect changes
+        private string CalculateSetVersionHash(int setId)
+        {
+            var setItems = _context.CompetencySetItems
+                .Where(csi => csi.SetID == setId)
+                .OrderBy(csi => csi.CompetencyID)
+                .Select(csi => new { csi.CompetencyID, csi.RequiredLevel, csi.IsMandatory })
+                .ToList();
+
+            var hashInput = string.Join("|", setItems.Select(i => $"{i.CompetencyID}:{i.RequiredLevel}:{i.IsMandatory}"));
+            
+            using (var sha256 = SHA256.Create())
+            {
+                var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(hashInput));
+                return Convert.ToBase64String(hashBytes);
+            }
+        }
+
+        // Mark all positions assigned to a set as out of sync
+        private async Task MarkPositionsOutOfSync(int setId)
+        {
+            var newHash = CalculateSetVersionHash(setId);
+            
+            var assignments = await _context.PositionCompetencySets
+                .Where(pcs => pcs.SetID == setId && pcs.IsActive)
+                .ToListAsync();
+
+            foreach (var assignment in assignments)
+            {
+                if (assignment.SetVersionHash != newHash)
+                {
+                    assignment.IsSynced = false;
+                    assignment.ModifiedDate = DateTime.Now;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        // Compare competencies between a set and a position
+        private async Task<List<CompetencyChangeDto>> CompareSetWithPosition(int setId, int positionId)
+        {
+            var setItems = await _context.CompetencySetItems
+                .Include(csi => csi.Competency)
+                .ThenInclude(c => c!.Category)
+                .ThenInclude(cat => cat!.Domain)
+                .Where(csi => csi.SetID == setId)
+                .ToListAsync();
+
+            var positionRequirements = await _context.PositionCompetencyRequirements
+                .Where(pcr => pcr.PositionID == positionId && pcr.IsActive)
+                .ToListAsync();
+
+            var positionReqDict = positionRequirements.ToDictionary(pr => pr.CompetencyID);
+            var changes = new List<CompetencyChangeDto>();
+
+            // Find added and modified competencies
+            foreach (var setItem in setItems)
+            {
+                if (!positionReqDict.ContainsKey(setItem.CompetencyID))
+                {
+                    // Competency in set but not in position (added)
+                    changes.Add(new CompetencyChangeDto
+                    {
+                        CompetencyID = setItem.CompetencyID,
+                        CompetencyName = setItem.Competency?.CompetencyName ?? "",
+                        CategoryName = setItem.Competency?.Category?.CategoryName,
+                        DomainName = setItem.Competency?.Category?.Domain?.DomainName,
+                        ChangeType = "added",
+                        NewLevel = setItem.RequiredLevel,
+                        NewIsMandatory = setItem.IsMandatory
+                    });
+                }
+                else
+                {
+                    var posReq = positionReqDict[setItem.CompetencyID];
+                    if (posReq.RequiredLevel != setItem.RequiredLevel || posReq.IsMandatory != setItem.IsMandatory)
+                    {
+                        // Competency exists but with different requirements (modified)
+                        changes.Add(new CompetencyChangeDto
+                        {
+                            CompetencyID = setItem.CompetencyID,
+                            CompetencyName = setItem.Competency?.CompetencyName ?? "",
+                            CategoryName = setItem.Competency?.Category?.CategoryName,
+                            DomainName = setItem.Competency?.Category?.Domain?.DomainName,
+                            ChangeType = "modified",
+                            OldLevel = posReq.RequiredLevel,
+                            NewLevel = setItem.RequiredLevel,
+                            OldIsMandatory = posReq.IsMandatory,
+                            NewIsMandatory = setItem.IsMandatory
+                        });
+                    }
+                }
+            }
+
+            // Find removed competencies (in position but not in set)
+            var setCompetencyIds = setItems.Select(si => si.CompetencyID).ToHashSet();
+            foreach (var posReq in positionRequirements)
+            {
+                if (!setCompetencyIds.Contains(posReq.CompetencyID))
+                {
+                    var competency = await _context.Competencies
+                        .Include(c => c.Category)
+                        .ThenInclude(cat => cat!.Domain)
+                        .FirstOrDefaultAsync(c => c.CompetencyID == posReq.CompetencyID);
+
+                    changes.Add(new CompetencyChangeDto
+                    {
+                        CompetencyID = posReq.CompetencyID,
+                        CompetencyName = competency?.CompetencyName ?? "",
+                        CategoryName = competency?.Category?.CategoryName,
+                        DomainName = competency?.Category?.Domain?.DomainName,
+                        ChangeType = "removed",
+                        OldLevel = posReq.RequiredLevel,
+                        OldIsMandatory = posReq.IsMandatory
+                    });
+                }
+            }
+
+            return changes;
+        }
+
+        #endregion
 
         // GET: api/CompetencySets
         [HttpGet]
@@ -44,7 +172,9 @@ namespace Career_Management.Server.Controllers
                     CreatedDate = cs.CreatedDate,
                     ModifiedDate = cs.ModifiedDate,
                     IsActive = cs.IsActive,
-                    CompetencyCount = cs.CompetencySetItems.Count
+                    CompetencyCount = cs.CompetencySetItems.Count,
+                    AssignedPositionsCount = _context.PositionCompetencySets.Count(pcs => pcs.SetID == cs.SetID && pcs.IsActive),
+                    OutOfSyncPositionsCount = _context.PositionCompetencySets.Count(pcs => pcs.SetID == cs.SetID && pcs.IsActive && !pcs.IsSynced)
                 })
                 .OrderBy(cs => cs.SetName)
                 .ToListAsync();
@@ -126,6 +256,7 @@ namespace Career_Management.Server.Controllers
                     SetID = csi.SetID,
                     CompetencyID = csi.CompetencyID,
                     CompetencyName = csi.Competency?.CompetencyName ?? "",
+                    CompetencyDescription = csi.Competency?.CompetencyDescription ?? "",
                     CategoryName = csi.Competency?.Category?.CategoryName,
                     DomainName = csi.Competency?.Category?.Domain?.DomainName,
                     RequiredLevel = csi.RequiredLevel,
@@ -155,6 +286,9 @@ namespace Career_Management.Server.Controllers
             item.DisplayOrder = request.DisplayOrder;
 
             await _context.SaveChangesAsync();
+
+            // Mark positions as out of sync
+            await MarkPositionsOutOfSync(id);
 
             return NoContent();
         }
@@ -264,6 +398,9 @@ namespace Career_Management.Server.Controllers
             _context.CompetencySetItems.Add(item);
             await _context.SaveChangesAsync();
 
+            // Mark positions as out of sync
+            await MarkPositionsOutOfSync(id);
+
             var competency = await _context.Competencies
                 .Include(c => c.Category)
                 .ThenInclude(cat => cat!.Domain)
@@ -275,6 +412,7 @@ namespace Career_Management.Server.Controllers
                 SetID = item.SetID,
                 CompetencyID = item.CompetencyID,
                 CompetencyName = competency?.CompetencyName ?? "",
+                CompetencyDescription = competency?.CompetencyDescription ?? "",
                 CategoryName = competency?.Category?.CategoryName,
                 DomainName = competency?.Category?.Domain?.DomainName,
                 RequiredLevel = item.RequiredLevel,
@@ -300,6 +438,9 @@ namespace Career_Management.Server.Controllers
 
             _context.CompetencySetItems.Remove(item);
             await _context.SaveChangesAsync();
+
+            // Mark positions as out of sync
+            await MarkPositionsOutOfSync(id);
 
             return NoContent();
         }
@@ -392,36 +533,396 @@ namespace Career_Management.Server.Controllers
             // Get current employee ID for tracking
             var currentEmployeeId = request.ModifiedBy;
 
-            // Remove existing competency requirements for this position
+            // Get existing competency requirements for this position
             var existingRequirements = await _context.PositionCompetencyRequirements
                 .Where(pcr => pcr.PositionID == request.PositionID && pcr.IsActive)
                 .ToListAsync();
 
-            foreach (var requirement in existingRequirements)
+            // Create a dictionary of existing requirements by CompetencyID for quick lookup
+            var existingRequirementsDict = existingRequirements.ToDictionary(r => r.CompetencyID);
+
+            // Process each competency in the set
+            var newRequirements = new List<PositionCompetencyRequirement>();
+            
+            foreach (var setItem in competencySet.CompetencySetItems)
             {
-                requirement.IsActive = false;
-                requirement.ModifiedDate = DateTime.Now;
-                requirement.ModifiedBy = currentEmployeeId;
+                if (existingRequirementsDict.ContainsKey(setItem.CompetencyID))
+                {
+                    // Update existing requirement with new values from the set
+                    var existingReq = existingRequirementsDict[setItem.CompetencyID];
+                    existingReq.RequiredLevel = setItem.RequiredLevel;
+                    existingReq.IsMandatory = setItem.IsMandatory;
+                    existingReq.ModifiedDate = DateTime.Now;
+                    existingReq.ModifiedBy = currentEmployeeId;
+                }
+                else
+                {
+                    // Add new requirement for competencies not already in the position
+                    newRequirements.Add(new PositionCompetencyRequirement
+                    {
+                        PositionID = request.PositionID,
+                        CompetencyID = setItem.CompetencyID,
+                        RequiredLevel = setItem.RequiredLevel,
+                        IsMandatory = setItem.IsMandatory,
+                        CreatedDate = DateTime.Now,
+                        ModifiedDate = DateTime.Now,
+                        ModifiedBy = currentEmployeeId,
+                        IsActive = true
+                    });
+                }
             }
 
-            // Add new competency requirements from the set
-            var newRequirements = competencySet.CompetencySetItems.Select(csi => new PositionCompetencyRequirement
+            // Add new requirements to the database
+            if (newRequirements.Any())
             {
-                PositionID = request.PositionID,
-                CompetencyID = csi.CompetencyID,
-                RequiredLevel = csi.RequiredLevel,
-                IsMandatory = csi.IsMandatory,
-                CreatedDate = DateTime.Now,
-                ModifiedDate = DateTime.Now,
-                ModifiedBy = currentEmployeeId,
-                IsActive = true
-            }).ToList();
+                _context.PositionCompetencyRequirements.AddRange(newRequirements);
+            }
 
-            _context.PositionCompetencyRequirements.AddRange(newRequirements);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
+
+        #region Position Assignment Endpoints
+
+        // GET: api/CompetencySets/{id}/positions
+        [HttpGet("{id}/positions")]
+        public async Task<ActionResult<IEnumerable<PositionCompetencySetDto>>> GetAssignedPositions(int id)
+        {
+            var assignments = await _context.PositionCompetencySets
+                .Include(pcs => pcs.Position)
+                .ThenInclude(p => p!.DepartmentNavigation)
+                .Include(pcs => pcs.AssignedByEmployee)
+                .Where(pcs => pcs.SetID == id && pcs.IsActive)
+                .Select(pcs => new PositionCompetencySetDto
+                {
+                    AssignmentID = pcs.AssignmentID,
+                    PositionID = pcs.PositionID,
+                    SetID = pcs.SetID,
+                    PositionTitle = pcs.Position!.PositionTitle,
+                    DepartmentName = pcs.Position.DepartmentNavigation != null ? pcs.Position.DepartmentNavigation.DepartmentName : null,
+                    AssignedDate = pcs.AssignedDate,
+                    LastSyncedDate = pcs.LastSyncedDate,
+                    IsSynced = pcs.IsSynced,
+                    AssignedByName = pcs.AssignedByEmployee != null ? 
+                        $"{pcs.AssignedByEmployee.FirstName} {pcs.AssignedByEmployee.LastName}".Trim() : "",
+                    CompetencyCount = _context.PositionCompetencyRequirements
+                        .Count(pcr => pcr.PositionID == pcs.PositionID && pcr.IsActive)
+                })
+                .OrderBy(dto => dto.PositionTitle)
+                .ToListAsync();
+
+            return Ok(assignments);
+        }
+
+        // GET: api/CompetencySets/{id}/available-positions
+        [HttpGet("{id}/available-positions")]
+        public async Task<ActionResult<IEnumerable<PositionDto>>> GetAvailablePositions(int id)
+        {
+            // Get positions that are not already assigned to this set
+            var assignedPositionIds = await _context.PositionCompetencySets
+                .Where(pcs => pcs.SetID == id && pcs.IsActive)
+                .Select(pcs => pcs.PositionID)
+                .ToListAsync();
+
+            var availablePositions = await _context.Positions
+                .Include(p => p.DepartmentNavigation)
+                .Where(p => p.IsActive && !assignedPositionIds.Contains(p.PositionID))
+                .Select(p => new PositionDto
+                {
+                    PositionID = p.PositionID,
+                    PositionTitle = p.PositionTitle,
+                    PositionDescription = p.PositionDescription,
+                    DepartmentName = p.DepartmentNavigation != null ? p.DepartmentNavigation.DepartmentName : null,
+                    IsActive = p.IsActive
+                })
+                .OrderBy(p => p.PositionTitle)
+                .ToListAsync();
+
+            return Ok(availablePositions);
+        }
+
+        // POST: api/CompetencySets/{id}/assign-position
+        [HttpPost("{id}/assign-position")]
+        public async Task<ActionResult<PositionCompetencySetDto>> AssignPositionToSet(int id, [FromBody] AssignPositionToSetRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Check if set exists
+            var competencySet = await _context.CompetencySets
+                .Include(cs => cs.CompetencySetItems)
+                .FirstOrDefaultAsync(cs => cs.SetID == id && cs.IsActive);
+
+            if (competencySet == null)
+            {
+                return NotFound("Competency set not found.");
+            }
+
+            // Check if position exists
+            var position = await _context.Positions.FindAsync(request.PositionID);
+            if (position == null || !position.IsActive)
+            {
+                return BadRequest("Position not found or inactive.");
+            }
+
+            // Check if assignment already exists
+            var existingAssignment = await _context.PositionCompetencySets
+                .FirstOrDefaultAsync(pcs => pcs.PositionID == request.PositionID && pcs.SetID == id);
+
+            if (existingAssignment != null)
+            {
+                if (existingAssignment.IsActive)
+                {
+                    return BadRequest("Position is already assigned to this competency set.");
+                }
+                else
+                {
+                    // Reactivate the assignment
+                    existingAssignment.IsActive = true;
+                    existingAssignment.ModifiedDate = DateTime.Now;
+                    existingAssignment.ModifiedBy = request.AssignedBy;
+                }
+            }
+            else
+            {
+                // Create new assignment
+                var newAssignment = new PositionCompetencySet
+                {
+                    PositionID = request.PositionID,
+                    SetID = id,
+                    AssignedDate = DateTime.Now,
+                    AssignedBy = request.AssignedBy,
+                    LastSyncedDate = DateTime.Now,
+                    SetVersionHash = CalculateSetVersionHash(id),
+                    IsSynced = true,
+                    IsActive = true,
+                    CreatedDate = DateTime.Now,
+                    ModifiedDate = DateTime.Now
+                };
+
+                _context.PositionCompetencySets.Add(newAssignment);
+            }
+
+            // Copy competencies from set to position
+            foreach (var setItem in competencySet.CompetencySetItems)
+            {
+                // Check if requirement already exists
+                var existingReq = await _context.PositionCompetencyRequirements
+                    .FirstOrDefaultAsync(pcr => pcr.PositionID == request.PositionID && pcr.CompetencyID == setItem.CompetencyID);
+
+                if (existingReq != null)
+                {
+                    // Update existing requirement
+                    existingReq.RequiredLevel = setItem.RequiredLevel;
+                    existingReq.IsMandatory = setItem.IsMandatory;
+                    existingReq.ModifiedDate = DateTime.Now;
+                    existingReq.ModifiedBy = request.AssignedBy;
+                    existingReq.IsActive = true;
+                }
+                else
+                {
+                    // Create new requirement
+                    var newRequirement = new PositionCompetencyRequirement
+                    {
+                        PositionID = request.PositionID,
+                        CompetencyID = setItem.CompetencyID,
+                        RequiredLevel = setItem.RequiredLevel,
+                        IsMandatory = setItem.IsMandatory,
+                        CreatedDate = DateTime.Now,
+                        ModifiedDate = DateTime.Now,
+                        ModifiedBy = request.AssignedBy,
+                        IsActive = true
+                    };
+
+                    _context.PositionCompetencyRequirements.Add(newRequirement);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Return the new assignment
+            var assignment = await _context.PositionCompetencySets
+                .Include(pcs => pcs.Position)
+                .ThenInclude(p => p!.DepartmentNavigation)
+                .Include(pcs => pcs.AssignedByEmployee)
+                .FirstOrDefaultAsync(pcs => pcs.PositionID == request.PositionID && pcs.SetID == id);
+
+            var dto = new PositionCompetencySetDto
+            {
+                AssignmentID = assignment!.AssignmentID,
+                PositionID = assignment.PositionID,
+                SetID = assignment.SetID,
+                PositionTitle = assignment.Position!.PositionTitle,
+                DepartmentName = assignment.Position.DepartmentNavigation?.DepartmentName,
+                AssignedDate = assignment.AssignedDate,
+                LastSyncedDate = assignment.LastSyncedDate,
+                IsSynced = assignment.IsSynced,
+                AssignedByName = assignment.AssignedByEmployee != null ? 
+                    $"{assignment.AssignedByEmployee.FirstName} {assignment.AssignedByEmployee.LastName}".Trim() : "",
+                CompetencyCount = competencySet.CompetencySetItems.Count
+            };
+
+            return Ok(dto);
+        }
+
+        // DELETE: api/CompetencySets/{id}/positions/{assignmentId}
+        [HttpDelete("{id}/positions/{assignmentId}")]
+        public async Task<IActionResult> RemovePositionAssignment(int id, int assignmentId)
+        {
+            var assignment = await _context.PositionCompetencySets
+                .FirstOrDefaultAsync(pcs => pcs.AssignmentID == assignmentId && pcs.SetID == id);
+
+            if (assignment == null)
+            {
+                return NotFound();
+            }
+
+            // Soft delete - don't remove the position requirements
+            assignment.IsActive = false;
+            assignment.ModifiedDate = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        // GET: api/CompetencySets/{id}/out-of-sync-positions
+        [HttpGet("{id}/out-of-sync-positions")]
+        public async Task<ActionResult<IEnumerable<PositionCompetencySetDto>>> GetOutOfSyncPositions(int id)
+        {
+            var assignments = await _context.PositionCompetencySets
+                .Include(pcs => pcs.Position)
+                .ThenInclude(p => p!.DepartmentNavigation)
+                .Include(pcs => pcs.AssignedByEmployee)
+                .Where(pcs => pcs.SetID == id && pcs.IsActive && !pcs.IsSynced)
+                .Select(pcs => new PositionCompetencySetDto
+                {
+                    AssignmentID = pcs.AssignmentID,
+                    PositionID = pcs.PositionID,
+                    SetID = pcs.SetID,
+                    PositionTitle = pcs.Position!.PositionTitle,
+                    DepartmentName = pcs.Position.DepartmentNavigation != null ? pcs.Position.DepartmentNavigation.DepartmentName : null,
+                    AssignedDate = pcs.AssignedDate,
+                    LastSyncedDate = pcs.LastSyncedDate,
+                    IsSynced = pcs.IsSynced,
+                    AssignedByName = pcs.AssignedByEmployee != null ? 
+                        $"{pcs.AssignedByEmployee.FirstName} {pcs.AssignedByEmployee.LastName}".Trim() : ""
+                })
+                .OrderBy(dto => dto.PositionTitle)
+                .ToListAsync();
+
+            return Ok(assignments);
+        }
+
+        // POST: api/CompetencySets/{id}/sync-positions
+        [HttpPost("{id}/sync-positions")]
+        public async Task<IActionResult> SyncPositionsWithSet(int id, [FromBody] SyncPositionWithSetRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var competencySet = await _context.CompetencySets
+                .Include(cs => cs.CompetencySetItems)
+                .FirstOrDefaultAsync(cs => cs.SetID == id && cs.IsActive);
+
+            if (competencySet == null)
+            {
+                return NotFound("Competency set not found.");
+            }
+
+            foreach (var assignmentId in request.AssignmentIDs)
+            {
+                var assignment = await _context.PositionCompetencySets
+                    .FirstOrDefaultAsync(pcs => pcs.AssignmentID == assignmentId && pcs.SetID == id && pcs.IsActive);
+
+                if (assignment == null)
+                {
+                    continue;
+                }
+
+                // Get current position requirements
+                var positionRequirements = await _context.PositionCompetencyRequirements
+                    .Where(pcr => pcr.PositionID == assignment.PositionID && pcr.IsActive)
+                    .ToListAsync();
+
+                var positionReqDict = positionRequirements.ToDictionary(pr => pr.CompetencyID);
+
+                // Update/add competencies from set
+                foreach (var setItem in competencySet.CompetencySetItems)
+                {
+                    if (positionReqDict.ContainsKey(setItem.CompetencyID))
+                    {
+                        // Update existing
+                        var existingReq = positionReqDict[setItem.CompetencyID];
+                        existingReq.RequiredLevel = setItem.RequiredLevel;
+                        existingReq.IsMandatory = setItem.IsMandatory;
+                        existingReq.ModifiedDate = DateTime.Now;
+                        existingReq.ModifiedBy = request.ModifiedBy;
+                    }
+                    else
+                    {
+                        // Add new
+                        var newRequirement = new PositionCompetencyRequirement
+                        {
+                            PositionID = assignment.PositionID,
+                            CompetencyID = setItem.CompetencyID,
+                            RequiredLevel = setItem.RequiredLevel,
+                            IsMandatory = setItem.IsMandatory,
+                            CreatedDate = DateTime.Now,
+                            ModifiedDate = DateTime.Now,
+                            ModifiedBy = request.ModifiedBy,
+                            IsActive = true
+                        };
+
+                        _context.PositionCompetencyRequirements.Add(newRequirement);
+                    }
+                }
+
+                // Update assignment
+                assignment.LastSyncedDate = DateTime.Now;
+                assignment.SetVersionHash = CalculateSetVersionHash(id);
+                assignment.IsSynced = true;
+                assignment.ModifiedDate = DateTime.Now;
+                assignment.ModifiedBy = request.ModifiedBy;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        // GET: api/CompetencySets/{id}/changes/{positionId}
+        [HttpGet("{id}/changes/{positionId}")]
+        public async Task<ActionResult<PositionSetChangesDto>> GetPositionSetChanges(int id, int positionId)
+        {
+            var assignment = await _context.PositionCompetencySets
+                .Include(pcs => pcs.Position)
+                .FirstOrDefaultAsync(pcs => pcs.SetID == id && pcs.PositionID == positionId && pcs.IsActive);
+
+            if (assignment == null)
+            {
+                return NotFound("Position assignment not found.");
+            }
+
+            var changes = await CompareSetWithPosition(id, positionId);
+
+            var dto = new PositionSetChangesDto
+            {
+                PositionID = positionId,
+                PositionTitle = assignment.Position!.PositionTitle,
+                AssignmentID = assignment.AssignmentID,
+                Changes = changes
+            };
+
+            return Ok(dto);
+        }
+
+        #endregion
 
         private bool CompetencySetExists(int id)
         {

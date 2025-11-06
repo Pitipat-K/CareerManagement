@@ -1,11 +1,14 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Security, LoginCallback } from '@okta/okta-react';
+import { PermissionProvider } from './contexts/PermissionContext';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import Home from './pages/Home';
 import OrganizationManagement from './pages/OrganizationManagement';
 import CompetencyManagement from './pages/CompetencyManagement';
 import EmployeeDevelopment from './pages/EmployeeDevelopment';
 import ImportData from './pages/ImportData';
+import UserManagement from './pages/UserManagement';
 import TestNotification from './components/TestNotification';
 import ProtectedRoute from './components/ProtectedRoute';
 import oktaAuth from './config/okta';
@@ -57,11 +60,13 @@ function App() {
 
   return (
     <Security oktaAuth={oktaAuth} restoreOriginalUri={restoreOriginalUri}>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
+      <PermissionProvider>
+        <Router>
+          <div className="min-h-screen bg-gray-50">
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/login/callback" element={<LoginCallback />} />
             <Route path="/home" element={
               <ProtectedRoute>
@@ -88,6 +93,11 @@ function App() {
                 <ImportData />
               </ProtectedRoute>
             } />
+            <Route path="/user-management/*" element={
+              <ProtectedRoute>
+                <UserManagement />
+              </ProtectedRoute>
+            } />
             <Route path="/test-notification" element={
               <ProtectedRoute>
                 <TestNotification />
@@ -96,6 +106,7 @@ function App() {
           </Routes>
         </div>
       </Router>
+      </PermissionProvider>
     </Security>
   );
 }

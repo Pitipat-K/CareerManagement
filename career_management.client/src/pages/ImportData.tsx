@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowLeft, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Download, Info, LogOut } from 'lucide-react';
 import { useOktaAuth } from '@okta/okta-react';
-import { clearAuthData } from '../utils/auth';
 import { getApiUrl } from '../config/api';
+import { usePermissionContext } from '../contexts/PermissionContext';
+import { performLogout } from '../utils/logout';
 
 interface ImportResult {
   success: boolean;
@@ -24,19 +25,11 @@ const ImportData = () => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [loadingPositions, setLoadingPositions] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
   const { oktaAuth } = useOktaAuth();
+  const { clearPermissions } = usePermissionContext();
 
   const handleLogout = async () => {
-    try {
-      clearAuthData();
-      await oktaAuth.signOut();
-      navigate('/login');
-    } catch (error) {
-      console.error('Error during logout:', error);
-      clearAuthData();
-      navigate('/login');
-    }
+    await performLogout(oktaAuth, clearPermissions);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {

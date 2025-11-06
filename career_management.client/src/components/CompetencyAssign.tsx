@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Search, X, Clipboard, ChevronDown, Check, Save, Package, Globe, Lock } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Clipboard, ChevronDown, Check, Save, Package, Globe, Lock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
+import { useModulePermissions } from '../hooks/usePermissions';
 
 interface PositionWithCompetencyCount {
     positionID: number;
@@ -54,7 +55,11 @@ interface CompetencySet {
     competencyCount: number;
 }
 
+type SortField = 'competencyName' | 'categoryName' | 'domainName' | 'requiredLevel';
+type SortDirection = 'asc' | 'desc';
+
 const CompetencyAssign = () => {
+    const { canCreate, canRead, canUpdate, canDelete } = useModulePermissions('COMP_ASSIGN');
     const [positions, setPositions] = useState<PositionWithCompetencyCount[]>([]);
     const [competencies, setCompetencies] = useState<Competency[]>([]);
     const [selectedPosition, setSelectedPosition] = useState<PositionWithCompetencyCount | null>(null);
@@ -64,6 +69,8 @@ const CompetencyAssign = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingRequirement, setEditingRequirement] = useState<PositionCompetencyRequirement | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [sortField, setSortField] = useState<SortField>('domainName');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
     const [formData, setFormData] = useState<CompetencyRequirementFormData>({
         competencyID: '',
         requiredLevel: '0',
@@ -85,10 +92,12 @@ const CompetencyAssign = () => {
     const [] = useState<CompetencySet | null>(null);
 
     useEffect(() => {
-        fetchPositions();
-        fetchCompetencies();
-        fetchCompetencySets();
-    }, []);
+        if (canRead) {
+            fetchPositions();
+            fetchCompetencies();
+            fetchCompetencySets();
+        }
+    }, [canRead]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -126,8 +135,15 @@ const CompetencyAssign = () => {
 
     const fetchCompetencySets = async () => {
         try {
-            const response = await axios.get(getApiUrl('competencysets?isPublic=true'));
-            setCompetencySets(response.data);
+            const response = await axios.get(getApiUrl('competencysets'));
+            const currentEmployeeId = getCurrentEmployeeId();
+            
+            // Filter to show: all public sets + only user's own private sets
+            const filteredSets = response.data.filter((set: CompetencySet) => 
+                set.isPublic || set.createdBy === currentEmployeeId
+            );
+            
+            setCompetencySets(filteredSets);
         } catch (error) {
             console.error('Error fetching competency sets:', error);
         }
@@ -153,6 +169,11 @@ const CompetencyAssign = () => {
     };
 
     const handleDelete = async (id: number) => {
+        if (!canDelete) {
+            alert('You do not have permission to delete competency assignments.');
+            return;
+        }
+        
         if (window.confirm('Are you sure you want to remove this competency requirement?')) {
             // Get current employee ID from localStorage
             const currentEmployee = localStorage.getItem('currentEmployee');
@@ -278,11 +299,21 @@ const CompetencyAssign = () => {
 
 
     const handleInlineEdit = (requirement: PositionCompetencyRequirement) => {
+        if (!canUpdate) {
+            alert('You do not have permission to edit competency requirements.');
+            return;
+        }
+        
         setInlineEditingId(requirement.requirementID);
         setInlineEditingLevel(requirement.requiredLevel.toString());
     };
 
     const handleInlineSave = async (requirementId: number) => {
+        if (!canUpdate) {
+            alert('You do not have permission to update competency requirements.');
+            return;
+        }
+        
         const newLevel = parseInt(inlineEditingLevel);
         if (isNaN(newLevel) || newLevel < 0 || newLevel > 4) {
             alert('Required level must be between 0 and 4.');
@@ -343,6 +374,11 @@ const CompetencyAssign = () => {
     };
 
     const handleAddNew = () => {
+        if (!canCreate) {
+            alert('You do not have permission to add competency requirements.');
+            return;
+        }
+        
         setEditingRequirement(null);
         setFormData({
             competencyID: '',
@@ -389,12 +425,17 @@ const CompetencyAssign = () => {
     };
 
     const handleApplyCompetencySet = async (competencySet: CompetencySet) => {
+        if (!canCreate) {
+            alert('You do not have permission to apply competency sets.');
+            return;
+        }
+        
         if (!selectedPosition) {
             alert('Please select a position first.');
             return;
         }
 
-        if (!window.confirm(`Are you sure you want to apply the competency set "${competencySet.setName}" to "${selectedPosition.positionTitle}"? This will replace all existing competency requirements.`)) {
+        if (!window.confirm(`Are you sure you want to apply the competency set "${competencySet.setName}" to "${selectedPosition.positionTitle}"? This will keep existing competencies and update any duplicates with values from the set.`)) {
             return;
         }
 
@@ -421,24 +462,40 @@ const CompetencyAssign = () => {
         }
     };
 
-    // Sort requirements by Domain, Category, and Competency Name
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
+    const getSortIcon = (field: SortField) => {
+        if (sortField !== field) {
+            return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+        }
+        return sortDirection === 'asc' 
+            ? <ArrowUp className="w-4 h-4 text-blue-600" />
+            : <ArrowDown className="w-4 h-4 text-blue-600" />;
+    };
+
+    // Sort requirements by selected field and direction
     const sortedRequirements = requirements.sort((a, b) => {
-        // First sort by Domain
-        const domainA = a.domainName || '';
-        const domainB = b.domainName || '';
-        if (domainA !== domainB) {
-            return domainA.localeCompare(domainB);
-        }
+        let aValue: string | number = '';
+        let bValue: string | number = '';
         
-        // Then sort by Category
-        const categoryA = a.categoryName || '';
-        const categoryB = b.categoryName || '';
-        if (categoryA !== categoryB) {
-            return categoryA.localeCompare(categoryB);
+        if (sortField === 'requiredLevel') {
+            aValue = a.requiredLevel;
+            bValue = b.requiredLevel;
+            const comparison = aValue - bValue;
+            return sortDirection === 'asc' ? comparison : -comparison;
+        } else {
+            aValue = (a[sortField] || '').toString();
+            bValue = (b[sortField] || '').toString();
+            const comparison = aValue.localeCompare(bValue);
+            return sortDirection === 'asc' ? comparison : -comparison;
         }
-        
-        // Finally sort by Competency Name
-        return (a.competencyName || '').localeCompare(b.competencyName || '');
     });
 
     if (loading) {
@@ -530,20 +587,24 @@ const CompetencyAssign = () => {
                                     </p>
                                 </div>
                                 <div className="flex space-x-2">
-                                    <button
-                                        onClick={() => setShowCompetencySetModal(true)}
-                                        className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                                    >
-                                        <Package className="w-4 h-4 mr-2" />
-                                        Apply Set
-                                    </button>
-                                    <button
-                                        onClick={handleAddNew}
-                                        className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                                    >
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Add Competency
-                                    </button>
+                                    {canCreate && (
+                                        <button
+                                            onClick={() => setShowCompetencySetModal(true)}
+                                            className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                                        >
+                                            <Package className="w-4 h-4 mr-2" />
+                                            Apply Set
+                                        </button>
+                                    )}
+                                    {canCreate && (
+                                        <button
+                                            onClick={handleAddNew}
+                                            className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                                        >
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Add Competency
+                                        </button>
+                                    )}
                                     {inlineEditingId !== null && (
                                         <button
                                             onClick={() => setInlineEditingId(null)}
@@ -568,17 +629,41 @@ const CompetencyAssign = () => {
                                                 <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     Actions
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                                                    Competency Name
+                                                <th 
+                                                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 cursor-pointer hover:bg-gray-100 select-none"
+                                                    onClick={() => handleSort('competencyName')}
+                                                >
+                                                    <div className="flex items-center space-x-1">
+                                                        <span>Competency Name</span>
+                                                        {getSortIcon('competencyName')}
+                                                    </div>
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                                                    Category
+                                                <th 
+                                                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 cursor-pointer hover:bg-gray-100 select-none"
+                                                    onClick={() => handleSort('categoryName')}
+                                                >
+                                                    <div className="flex items-center space-x-1">
+                                                        <span>Category</span>
+                                                        {getSortIcon('categoryName')}
+                                                    </div>
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                                                    Domain
+                                                <th 
+                                                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 cursor-pointer hover:bg-gray-100 select-none"
+                                                    onClick={() => handleSort('domainName')}
+                                                >
+                                                    <div className="flex items-center space-x-1">
+                                                        <span>Domain</span>
+                                                        {getSortIcon('domainName')}
+                                                    </div>
                                                 </th>
-                                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                                                    Required
+                                                <th 
+                                                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 cursor-pointer hover:bg-gray-100 select-none"
+                                                    onClick={() => handleSort('requiredLevel')}
+                                                >
+                                                    <div className="flex items-center space-x-1">
+                                                        <span>Required</span>
+                                                        {getSortIcon('requiredLevel')}
+                                                    </div>
                                                 </th>
                                                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                                     Modified By
@@ -595,19 +680,23 @@ const CompetencyAssign = () => {
                                                     </td>
                                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                         <div className="flex items-center justify-end space-x-2">
-                                                            <button
-                                                                onClick={() => handleInlineEdit(requirement)}
-                                                                className="text-blue-600 hover:text-blue-900 p-1"
-                                                                title="Edit Required Level"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(requirement.requirementID)}
-                                                                className="text-red-600 hover:text-red-900 p-1"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
+                                                            {canUpdate && (
+                                                                <button
+                                                                    onClick={() => handleInlineEdit(requirement)}
+                                                                    className="text-blue-600 hover:text-blue-900 p-1"
+                                                                    title="Edit Required Level"
+                                                                >
+                                                                    <Edit className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                            {canDelete && (
+                                                                <button
+                                                                    onClick={() => handleDelete(requirement.requirementID)}
+                                                                    className="text-red-600 hover:text-red-900 p-1"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-left">
@@ -860,7 +949,7 @@ const CompetencyAssign = () => {
                         <div className="mb-4">
                             <p className="text-gray-600">
                                 Select a competency set to apply to "{selectedPosition?.positionTitle}". 
-                                This will replace all existing competency requirements.
+                                This will keep existing competencies and update any duplicates with values from the set.
                             </p>
                         </div>
 
@@ -884,12 +973,14 @@ const CompetencyAssign = () => {
                                             <span>by {set.createdByEmployeeName || 'Unknown'}</span>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => handleApplyCompetencySet(set)}
-                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                                    >
-                                        Apply Set
-                                    </button>
+                                    {canCreate && (
+                                        <button
+                                            onClick={() => handleApplyCompetencySet(set)}
+                                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            Apply Set
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>

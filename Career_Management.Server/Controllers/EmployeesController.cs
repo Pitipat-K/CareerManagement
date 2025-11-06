@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Career_Management.Server.Data;
 using Career_Management.Server.Models;
 using Career_Management.Server.Models.DTOs;
+using Career_Management.Server.Services;
 using OfficeOpenXml;
 using System.Data;
 
@@ -13,16 +14,41 @@ namespace Career_Management.Server.Controllers
     public class EmployeesController : ControllerBase
     {
         private readonly CareerManagementContext _context;
+        private readonly IPermissionService _permissionService;
 
-        public EmployeesController(CareerManagementContext context)
+        public EmployeesController(CareerManagementContext context, IPermissionService permissionService)
         {
             _context = context;
+            _permissionService = permissionService;
+        }
+
+        // Helper method to get current user ID (you'll need to implement this based on your auth setup)
+        private async Task<int?> GetCurrentUserIdAsync()
+        {
+            // TODO: Implement based on your authentication setup
+            // This is a placeholder - you might get this from JWT claims, session, etc.
+            // For now, return a default user ID for testing
+            return 1;
+        }
+
+        // Helper method to check permission
+        private async Task<bool> CheckPermissionAsync(string permissionCode)
+        {
+            var currentUserId = await GetCurrentUserIdAsync();
+            if (!currentUserId.HasValue) return false;
+            
+            return await _permissionService.HasPermissionAsync(currentUserId.Value, "EMP", permissionCode);
         }
 
         // GET: api/Employees
         [HttpGet]
         public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetEmployees()
         {
+            // Check permission
+            if (!await CheckPermissionAsync("R"))
+            {
+                return Forbid("Insufficient permissions to view employees");
+            }
             var employees = await _context.Employees
                 .Where(e => e.IsActive)
                 .Include(e => e.Position)
@@ -119,6 +145,11 @@ namespace Career_Management.Server.Controllers
         [HttpPost]
         public async Task<ActionResult<Employee>> CreateEmployee(Employee employee)
         {
+            // Check permission
+            if (!await CheckPermissionAsync("C"))
+            {
+                return Forbid("Insufficient permissions to create employees");
+            }
             employee.CreatedDate = DateTime.Now;
             employee.ModifiedDate = DateTime.Now;
             employee.ModifiedBy = employee.ModifiedBy; // Added

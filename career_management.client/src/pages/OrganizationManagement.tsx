@@ -1,9 +1,9 @@
 import { Routes, Route, NavLink, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { ArrowLeft, Users, Briefcase, Building2, Building, Menu, X, ChevronLeft, ChevronRight, Wrench, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useOktaAuth } from '@okta/okta-react';
-import { clearAuthData } from '../utils/auth';
+import { usePermissionContext } from '../contexts/PermissionContext';
+import { performLogout } from '../utils/logout';
 import Employees from '../components/Employees';
 import Positions from '../components/Positions';
 import Departments from '../components/Departments';
@@ -13,19 +13,11 @@ import JobFunctions from '../components/JobFunctions';
 const OrganizationManagement = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const navigate = useNavigate();
   const { oktaAuth } = useOktaAuth();
+  const { clearPermissions } = usePermissionContext();
 
   const handleLogout = async () => {
-    try {
-      clearAuthData();
-      await oktaAuth.signOut();
-      navigate('/login');
-    } catch (error) {
-      console.error('Error during logout:', error);
-      clearAuthData();
-      navigate('/login');
-    }
+    await performLogout(oktaAuth, clearPermissions);
   };
 
   const menuItems = [

@@ -26,6 +26,12 @@ builder.Services.AddHttpClient();
 // Add Notification Service
 builder.Services.AddScoped<Career_Management.Server.Services.NotificationService>();
 
+// Add Permission Service
+builder.Services.AddScoped<Career_Management.Server.Services.IPermissionService, Career_Management.Server.Services.PermissionService>();
+
+// Add Email Service
+builder.Services.AddScoped<Career_Management.Server.Services.IEmailService, Career_Management.Server.Services.EmailService>();
+
 // Add Okta Authentication
 builder.Services.AddAuthentication(options =>
 {

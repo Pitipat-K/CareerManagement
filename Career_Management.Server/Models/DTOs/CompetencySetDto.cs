@@ -12,5 +12,7 @@ namespace Career_Management.Server.Models.DTOs
         public DateTime ModifiedDate { get; set; }
         public bool IsActive { get; set; }
         public int CompetencyCount { get; set; }
+        public int? AssignedPositionsCount { get; set; }
+        public int? OutOfSyncPositionsCount { get; set; }
     }
 }

@@ -1,4 +1,3 @@
-import React from 'react';
 import { getUserEmail, getOktaUser, getCurrentEmployee } from '../utils/auth';
 
 /**

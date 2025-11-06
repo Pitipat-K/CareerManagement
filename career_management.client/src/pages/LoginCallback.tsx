@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOktaAuth } from '@okta/okta-react';
 import { getApiUrl } from '../config/api';
+import { userManagementApi } from '../services/userManagementApi';
 
 const LoginCallback = () => {
   const { oktaAuth, authState } = useOktaAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
-  // Helper function to find employee by email
+  // Helper function to find employee by email and verify user account exists
   const findEmployeeByEmail = async (email: string): Promise<boolean> => {
     try {
       console.log('Searching for employee with email:', email);
@@ -27,9 +28,29 @@ const LoginCallback = () => {
 
         if (employee) {
           console.log('✅ Employee found:', employee);
-          localStorage.setItem('currentEmployee', JSON.stringify(employee));
-          localStorage.setItem('isAuthenticated', 'true');
-          return true;
+          
+          // Now check if a User account exists for this employee
+          try {
+            console.log('Checking if User account exists for employee ID:', employee.employeeID);
+            const user = await userManagementApi.getUserByEmployeeId(employee.employeeID);
+            
+            if (user) {
+              console.log('✅ User account found:', user);
+              localStorage.setItem('currentEmployee', JSON.stringify(employee));
+              localStorage.setItem('isAuthenticated', 'true');
+              return true;
+            } else {
+              console.log('❌ User account not found for employee');
+              return false;
+            }
+          } catch (userError: any) {
+            console.log('❌ User account not found for employee:', userError.response?.status);
+            // If 404, user doesn't exist; clear any stored data
+            if (userError.response?.status === 404) {
+              console.log('User account does not exist in the system');
+            }
+            return false;
+          }
         } else {
           console.log('❌ Employee not found with email:', email);
           return false;
@@ -107,15 +128,21 @@ const LoginCallback = () => {
             localStorage.setItem('userEmail', email);
             console.log('User email extracted:', email);
             
-            // Find employee by email
+            // Find employee by email and verify user account exists
             const employeeFound = await findEmployeeByEmail(email);
             if (employeeFound) {
               console.log('✅ Authentication successful, redirecting to home');
               localStorage.setItem('isAuthenticated', 'true');
               navigate('/home');
             } else {
-              console.log('❌ Employee not found, redirecting to login');
-              navigate('/login?error=employee_not_found');
+              console.log('❌ Employee or User account not found, signing out and redirecting to login');
+              // Sign out from Okta since user doesn't have access
+              await oktaAuth.signOut();
+              // Clear any partial auth data
+              localStorage.removeItem('oktaUser');
+              localStorage.removeItem('userEmail');
+              localStorage.removeItem('isAuthenticated');
+              navigate('/login?error=no_user_account');
             }
           } else {
             console.log('❌ No email found in user info, redirecting to login');

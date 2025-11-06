@@ -27,6 +27,19 @@ namespace Career_Management.Server.Data
         public DbSet<JobFunction> JobFunctions { get; set; }
         public DbSet<CompetencySet> CompetencySets { get; set; }
         public DbSet<CompetencySetItem> CompetencySetItems { get; set; }
+        public DbSet<PositionCompetencySet> PositionCompetencySets { get; set; }
+        
+        // User Management entities
+        public DbSet<User> Users { get; set; }
+        public DbSet<ApplicationModule> ApplicationModules { get; set; }
+        public DbSet<PermissionType> PermissionTypes { get; set; }
+        public DbSet<Permission> Permissions { get; set; }
+        public DbSet<Role> Roles { get; set; }
+        public DbSet<RolePermission> RolePermissions { get; set; }
+        public DbSet<UserRole> UserRoles { get; set; }
+        public DbSet<UserPermissionOverride> UserPermissionOverrides { get; set; }
+        public DbSet<PermissionAuditLog> PermissionAuditLogs { get; set; }
+        public DbSet<PasswordResetVerification> PasswordResetVerifications { get; set; }
         
         // View for Competency Progress
         public DbSet<CompetencyProgress> CompetencyProgress { get; set; }
@@ -248,6 +261,198 @@ namespace Career_Management.Server.Data
                 .WithMany()
                 .HasForeignKey(csi => csi.CompetencyID)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // PositionCompetencySet relationships
+            modelBuilder.Entity<PositionCompetencySet>()
+                .HasOne(pcs => pcs.Position)
+                .WithMany()
+                .HasForeignKey(pcs => pcs.PositionID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PositionCompetencySet>()
+                .HasOne(pcs => pcs.CompetencySet)
+                .WithMany()
+                .HasForeignKey(pcs => pcs.SetID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PositionCompetencySet>()
+                .HasOne(pcs => pcs.AssignedByEmployee)
+                .WithMany()
+                .HasForeignKey(pcs => pcs.AssignedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PositionCompetencySet>()
+                .HasOne(pcs => pcs.ModifiedByEmployee)
+                .WithMany()
+                .HasForeignKey(pcs => pcs.ModifiedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PositionCompetencySet>()
+                .HasIndex(pcs => new { pcs.PositionID, pcs.SetID })
+                .IsUnique();
+
+            // User Management relationships
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Employee)
+                .WithMany()
+                .HasForeignKey(u => u.EmployeeID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.ModifiedByEmployee)
+                .WithMany()
+                .HasForeignKey(u => u.ModifiedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.EmployeeID)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Username)
+                .IsUnique();
+
+            modelBuilder.Entity<ApplicationModule>()
+                .HasOne(am => am.ModifiedByEmployee)
+                .WithMany()
+                .HasForeignKey(am => am.ModifiedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ApplicationModule>()
+                .HasIndex(am => am.ModuleCode)
+                .IsUnique();
+
+            modelBuilder.Entity<PermissionType>()
+                .HasOne(pt => pt.ModifiedByEmployee)
+                .WithMany()
+                .HasForeignKey(pt => pt.ModifiedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PermissionType>()
+                .HasIndex(pt => pt.PermissionCode)
+                .IsUnique();
+
+            modelBuilder.Entity<Permission>()
+                .HasOne(p => p.Module)
+                .WithMany(am => am.Permissions)
+                .HasForeignKey(p => p.ModuleID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Permission>()
+                .HasOne(p => p.PermissionType)
+                .WithMany(pt => pt.Permissions)
+                .HasForeignKey(p => p.PermissionTypeID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Permission>()
+                .HasOne(p => p.ModifiedByEmployee)
+                .WithMany()
+                .HasForeignKey(p => p.ModifiedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Permission>()
+                .HasIndex(p => new { p.ModuleID, p.PermissionTypeID })
+                .IsUnique();
+
+            modelBuilder.Entity<Role>()
+                .HasOne(r => r.Department)
+                .WithMany()
+                .HasForeignKey(r => r.DepartmentID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Role>()
+                .HasOne(r => r.Company)
+                .WithMany()
+                .HasForeignKey(r => r.CompanyID)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Role>()
+                .HasOne(r => r.ModifiedByEmployee)
+                .WithMany()
+                .HasForeignKey(r => r.ModifiedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Role>()
+                .HasIndex(r => r.RoleCode)
+                .IsUnique();
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.Role)
+                .WithMany(r => r.RolePermissions)
+                .HasForeignKey(rp => rp.RoleID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.Permission)
+                .WithMany(p => p.RolePermissions)
+                .HasForeignKey(rp => rp.PermissionID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.GrantedByEmployee)
+                .WithMany()
+                .HasForeignKey(rp => rp.GrantedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RolePermission>()
+                .HasIndex(rp => new { rp.RoleID, rp.PermissionID })
+                .IsUnique();
+
+            modelBuilder.Entity<UserRole>()
+                .HasOne(ur => ur.User)
+                .WithMany(u => u.UserRoles)
+                .HasForeignKey(ur => ur.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<UserRole>()
+                .HasOne(ur => ur.Role)
+                .WithMany(r => r.UserRoles)
+                .HasForeignKey(ur => ur.RoleID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<UserRole>()
+                .HasOne(ur => ur.AssignedByEmployee)
+                .WithMany()
+                .HasForeignKey(ur => ur.AssignedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<UserRole>()
+                .HasIndex(ur => new { ur.UserID, ur.RoleID })
+                .IsUnique();
+
+            modelBuilder.Entity<UserPermissionOverride>()
+                .HasOne(upo => upo.User)
+                .WithMany(u => u.UserPermissionOverrides)
+                .HasForeignKey(upo => upo.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<UserPermissionOverride>()
+                .HasOne(upo => upo.Permission)
+                .WithMany(p => p.UserPermissionOverrides)
+                .HasForeignKey(upo => upo.PermissionID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<UserPermissionOverride>()
+                .HasOne(upo => upo.CreatedByEmployee)
+                .WithMany()
+                .HasForeignKey(upo => upo.CreatedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<UserPermissionOverride>()
+                .HasIndex(upo => new { upo.UserID, upo.PermissionID })
+                .IsUnique();
+
+            modelBuilder.Entity<PermissionAuditLog>()
+                .HasOne(pal => pal.User)
+                .WithMany()
+                .HasForeignKey(pal => pal.UserID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PermissionAuditLog>()
+                .HasOne(pal => pal.ActionByEmployee)
+                .WithMany()
+                .HasForeignKey(pal => pal.ActionBy)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 } 
