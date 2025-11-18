@@ -821,105 +821,185 @@ namespace Career_Management.Server.Controllers
         [HttpPost("{id}/sync-positions")]
         public async Task<IActionResult> SyncPositionsWithSet(int id, [FromBody] SyncPositionWithSetRequest request)
         {
-            if (!ModelState.IsValid)
+            try
             {
-                return BadRequest(ModelState);
-            }
-
-            var competencySet = await _context.CompetencySets
-                .Include(cs => cs.CompetencySetItems)
-                .FirstOrDefaultAsync(cs => cs.SetID == id && cs.IsActive);
-
-            if (competencySet == null)
-            {
-                return NotFound("Competency set not found.");
-            }
-
-            foreach (var assignmentId in request.AssignmentIDs)
-            {
-                var assignment = await _context.PositionCompetencySets
-                    .FirstOrDefaultAsync(pcs => pcs.AssignmentID == assignmentId && pcs.SetID == id && pcs.IsActive);
-
-                if (assignment == null)
+                Console.WriteLine($"=== SYNC POSITIONS REQUEST ===");
+                Console.WriteLine($"SetID: {id}");
+                Console.WriteLine($"AssignmentIDs: {(request.AssignmentIDs != null ? string.Join(", ", request.AssignmentIDs) : "NULL")}");
+                Console.WriteLine($"ModifiedBy: {request.ModifiedBy}");
+                
+                if (!ModelState.IsValid)
                 {
-                    continue;
+                    Console.WriteLine($"ModelState Invalid: {string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage))}");
+                    return BadRequest(ModelState);
                 }
 
-                // Get current position requirements
-                var positionRequirements = await _context.PositionCompetencyRequirements
-                    .Where(pcr => pcr.PositionID == assignment.PositionID && pcr.IsActive)
-                    .ToListAsync();
-
-                var positionReqDict = positionRequirements.ToDictionary(pr => pr.CompetencyID);
-
-                // Update/add competencies from set
-                foreach (var setItem in competencySet.CompetencySetItems)
+                if (request.AssignmentIDs == null || !request.AssignmentIDs.Any())
                 {
-                    if (positionReqDict.ContainsKey(setItem.CompetencyID))
+                    Console.WriteLine("ERROR: No assignment IDs provided.");
+                    return BadRequest("No assignment IDs provided.");
+                }
+
+                if (request.ModifiedBy <= 0)
+                {
+                    Console.WriteLine($"ERROR: Invalid ModifiedBy employee ID: {request.ModifiedBy}");
+                    return BadRequest("Invalid ModifiedBy employee ID.");
+                }
+
+                var competencySet = await _context.CompetencySets
+                    .Include(cs => cs.CompetencySetItems)
+                    .FirstOrDefaultAsync(cs => cs.SetID == id && cs.IsActive);
+
+                if (competencySet == null)
+                {
+                    Console.WriteLine($"ERROR: Competency set {id} not found.");
+                    return NotFound("Competency set not found.");
+                }
+
+                Console.WriteLine($"Found competency set: {competencySet.SetName} with {competencySet.CompetencySetItems.Count} items");
+
+                if (!competencySet.CompetencySetItems.Any())
+                {
+                    Console.WriteLine("ERROR: Competency set has no items.");
+                    return BadRequest("Competency set has no items to sync.");
+                }
+
+                foreach (var assignmentId in request.AssignmentIDs)
+                {
+                    Console.WriteLine($"Processing assignment ID: {assignmentId}");
+                    
+                    var assignment = await _context.PositionCompetencySets
+                        .FirstOrDefaultAsync(pcs => pcs.AssignmentID == assignmentId && pcs.SetID == id && pcs.IsActive);
+
+                    if (assignment == null)
                     {
-                        // Update existing
-                        var existingReq = positionReqDict[setItem.CompetencyID];
-                        existingReq.RequiredLevel = setItem.RequiredLevel;
-                        existingReq.IsMandatory = setItem.IsMandatory;
-                        existingReq.ModifiedDate = DateTime.Now;
-                        existingReq.ModifiedBy = request.ModifiedBy;
+                        Console.WriteLine($"WARNING: Assignment {assignmentId} not found or inactive. Skipping.");
+                        continue;
                     }
-                    else
+
+                    Console.WriteLine($"Found assignment for position ID: {assignment.PositionID}");
+
+                    // Get current position requirements
+                    var positionRequirements = await _context.PositionCompetencyRequirements
+                        .Where(pcr => pcr.PositionID == assignment.PositionID && pcr.IsActive)
+                        .ToListAsync();
+
+                    Console.WriteLine($"Position has {positionRequirements.Count} existing requirements");
+
+                    // Handle potential duplicates by grouping and taking the most recent
+                    var positionReqDict = positionRequirements
+                        .GroupBy(pr => pr.CompetencyID)
+                        .ToDictionary(
+                            g => g.Key, 
+                            g => g.OrderByDescending(pr => pr.ModifiedDate ?? pr.CreatedDate).First()
+                        );
+                    
+                    if (positionRequirements.Count != positionReqDict.Count)
                     {
-                        // Add new
-                        var newRequirement = new PositionCompetencyRequirement
+                        Console.WriteLine($"WARNING: Found {positionRequirements.Count - positionReqDict.Count} duplicate competency requirements. Using most recent.");
+                    }
+
+                    // Update/add competencies from set
+                    foreach (var setItem in competencySet.CompetencySetItems)
+                    {
+                        if (positionReqDict.ContainsKey(setItem.CompetencyID))
                         {
-                            PositionID = assignment.PositionID,
-                            CompetencyID = setItem.CompetencyID,
-                            RequiredLevel = setItem.RequiredLevel,
-                            IsMandatory = setItem.IsMandatory,
-                            CreatedDate = DateTime.Now,
-                            ModifiedDate = DateTime.Now,
-                            ModifiedBy = request.ModifiedBy,
-                            IsActive = true
-                        };
+                            // Update existing
+                            Console.WriteLine($"Updating existing competency {setItem.CompetencyID}");
+                            var existingReq = positionReqDict[setItem.CompetencyID];
+                            existingReq.RequiredLevel = setItem.RequiredLevel;
+                            existingReq.IsMandatory = setItem.IsMandatory;
+                            existingReq.ModifiedDate = DateTime.Now;
+                            existingReq.ModifiedBy = request.ModifiedBy;
+                        }
+                        else
+                        {
+                            // Add new
+                            Console.WriteLine($"Adding new competency {setItem.CompetencyID}");
+                            var newRequirement = new PositionCompetencyRequirement
+                            {
+                                PositionID = assignment.PositionID,
+                                CompetencyID = setItem.CompetencyID,
+                                RequiredLevel = setItem.RequiredLevel,
+                                IsMandatory = setItem.IsMandatory,
+                                CreatedDate = DateTime.Now,
+                                ModifiedDate = DateTime.Now,
+                                ModifiedBy = request.ModifiedBy,
+                                IsActive = true
+                            };
 
-                        _context.PositionCompetencyRequirements.Add(newRequirement);
+                            _context.PositionCompetencyRequirements.Add(newRequirement);
+                        }
                     }
+
+                    // Update assignment
+                    Console.WriteLine($"Updating assignment sync status");
+                    assignment.LastSyncedDate = DateTime.Now;
+                    assignment.SetVersionHash = CalculateSetVersionHash(id);
+                    assignment.IsSynced = true;
+                    assignment.ModifiedDate = DateTime.Now;
+                    assignment.ModifiedBy = request.ModifiedBy;
                 }
 
-                // Update assignment
-                assignment.LastSyncedDate = DateTime.Now;
-                assignment.SetVersionHash = CalculateSetVersionHash(id);
-                assignment.IsSynced = true;
-                assignment.ModifiedDate = DateTime.Now;
-                assignment.ModifiedBy = request.ModifiedBy;
+                Console.WriteLine("Saving changes to database...");
+                await _context.SaveChangesAsync();
+                Console.WriteLine("✅ Sync completed successfully!");
+
+                return NoContent();
             }
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            catch (Exception ex)
+            {
+                // Log the error for debugging
+                Console.WriteLine($"Error in SyncPositionsWithSet: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { 
+                    message = "An error occurred while syncing positions.", 
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message
+                });
+            }
         }
 
         // GET: api/CompetencySets/{id}/changes/{positionId}
         [HttpGet("{id}/changes/{positionId}")]
         public async Task<ActionResult<PositionSetChangesDto>> GetPositionSetChanges(int id, int positionId)
         {
-            var assignment = await _context.PositionCompetencySets
-                .Include(pcs => pcs.Position)
-                .FirstOrDefaultAsync(pcs => pcs.SetID == id && pcs.PositionID == positionId && pcs.IsActive);
-
-            if (assignment == null)
+            try
             {
-                return NotFound("Position assignment not found.");
+                var assignment = await _context.PositionCompetencySets
+                    .Include(pcs => pcs.Position)
+                    .FirstOrDefaultAsync(pcs => pcs.SetID == id && pcs.PositionID == positionId && pcs.IsActive);
+
+                if (assignment == null)
+                {
+                    return NotFound("Position assignment not found.");
+                }
+
+                var changes = await CompareSetWithPosition(id, positionId);
+
+                var dto = new PositionSetChangesDto
+                {
+                    PositionID = positionId,
+                    PositionTitle = assignment.Position!.PositionTitle,
+                    AssignmentID = assignment.AssignmentID,
+                    Changes = changes
+                };
+
+                return Ok(dto);
             }
-
-            var changes = await CompareSetWithPosition(id, positionId);
-
-            var dto = new PositionSetChangesDto
+            catch (Exception ex)
             {
-                PositionID = positionId,
-                PositionTitle = assignment.Position!.PositionTitle,
-                AssignmentID = assignment.AssignmentID,
-                Changes = changes
-            };
-
-            return Ok(dto);
+                // Log the error for debugging
+                Console.WriteLine($"Error in GetPositionSetChanges: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { 
+                    message = "An error occurred while fetching position changes.", 
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message
+                });
+            }
         }
 
         #endregion

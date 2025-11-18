@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Career_Management.Server.Data;
 using Career_Management.Server.Models;
 using Career_Management.Server.Models.DTOs;
+using Career_Management.Server.Services;
 
 namespace Career_Management.Server.Controllers
 {
@@ -11,16 +12,42 @@ namespace Career_Management.Server.Controllers
     public class JobFunctionsController : ControllerBase
     {
         private readonly CareerManagementContext _context;
+        private readonly IPermissionService _permissionService;
 
-        public JobFunctionsController(CareerManagementContext context)
+        public JobFunctionsController(CareerManagementContext context, IPermissionService permissionService)
         {
             _context = context;
+            _permissionService = permissionService;
+        }
+
+        // Helper method to get current user ID
+        private async Task<int?> GetCurrentUserIdAsync()
+        {
+            // TODO: Implement based on your authentication setup
+            // This is a placeholder - you might get this from JWT claims, session, etc.
+            // For now, return a default user ID for testing
+            return 1;
+        }
+
+        // Helper method to check permission
+        private async Task<bool> CheckPermissionAsync(string permissionCode)
+        {
+            var currentUserId = await GetCurrentUserIdAsync();
+            if (!currentUserId.HasValue) return false;
+            
+            return await _permissionService.HasPermissionAsync(currentUserId.Value, "JOBFUNCTIONS", permissionCode);
         }
 
         // GET: api/JobFunctions
         [HttpGet]
         public async Task<ActionResult<IEnumerable<JobFunctionDto>>> GetJobFunctions()
         {
+            // Check permission
+            if (!await CheckPermissionAsync("R"))
+            {
+                return Forbid("Insufficient permissions to view job functions");
+            }
+
             var jobFunctions = await _context.JobFunctions
                 .Where(jf => jf.IsActive)
                 .Include(jf => jf.Department)
@@ -80,6 +107,12 @@ namespace Career_Management.Server.Controllers
         [HttpPost]
         public async Task<ActionResult<JobFunction>> CreateJobFunction([FromBody] JobFunction jobFunction)
         {
+            // Check permission
+            if (!await CheckPermissionAsync("C"))
+            {
+                return Forbid("Insufficient permissions to create job functions");
+            }
+
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
@@ -99,6 +132,12 @@ namespace Career_Management.Server.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateJobFunction(int id, [FromBody] JobFunction jobFunction)
         {
+            // Check permission
+            if (!await CheckPermissionAsync("U"))
+            {
+                return Forbid("Insufficient permissions to update job functions");
+            }
+
             if (id != jobFunction.JobFunctionID)
             {
                 return BadRequest();
@@ -139,6 +178,12 @@ namespace Career_Management.Server.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteJobFunction(int id, [FromQuery] int modifiedBy)
         {
+            // Check permission
+            if (!await CheckPermissionAsync("D"))
+            {
+                return Forbid("Insufficient permissions to delete job functions");
+            }
+
             var jobFunction = await _context.JobFunctions.FindAsync(id);
             if (jobFunction == null)
             {

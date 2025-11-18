@@ -55,6 +55,13 @@ interface CompetencySet {
     competencyCount: number;
 }
 
+interface CompetencySetItem {
+    itemID: number;
+    setID: number;
+    competencyID: number;
+    requiredLevel: number;
+}
+
 type SortField = 'competencyName' | 'categoryName' | 'domainName' | 'requiredLevel';
 type SortDirection = 'asc' | 'desc';
 
@@ -90,6 +97,8 @@ const CompetencyAssign = () => {
     const [competencySets, setCompetencySets] = useState<CompetencySet[]>([]);
     const [showCompetencySetModal, setShowCompetencySetModal] = useState(false);
     const [] = useState<CompetencySet | null>(null);
+    const [appliedSetIds, setAppliedSetIds] = useState<Set<number>>(new Set());
+    const [checkingAppliedSets, setCheckingAppliedSets] = useState(false);
 
     useEffect(() => {
         if (canRead) {
@@ -98,6 +107,13 @@ const CompetencyAssign = () => {
             fetchCompetencySets();
         }
     }, [canRead]);
+
+    // Check applied sets when modal opens and data is ready
+    useEffect(() => {
+        if (showCompetencySetModal && selectedPosition && requirements.length > 0 && competencySets.length > 0) {
+            checkAppliedSets(requirements);
+        }
+    }, [showCompetencySetModal]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -158,8 +174,52 @@ const CompetencyAssign = () => {
         try {
             const response = await axios.get(getApiUrl(`positioncompetencyrequirements/position/${positionId}`));
             setRequirements(response.data);
+            // After fetching requirements, check which competency sets are applied
+            await checkAppliedSets(response.data);
         } catch (error) {
             console.error('Error fetching requirements:', error);
+        }
+    };
+
+    const checkAppliedSets = async (currentRequirements: PositionCompetencyRequirement[]) => {
+        if (competencySets.length === 0 || currentRequirements.length === 0) {
+            setAppliedSetIds(new Set());
+            return;
+        }
+
+        setCheckingAppliedSets(true);
+        const appliedIds = new Set<number>();
+
+        try {
+            // Check each competency set to see if it's applied
+            await Promise.all(
+                competencySets.map(async (set) => {
+                    try {
+                        const response = await axios.get(getApiUrl(`competencysets/${set.setID}/items`));
+                        const setItems: CompetencySetItem[] = response.data;
+
+                        // Check if all items in the set exist in current requirements with same or higher level
+                        const isFullyApplied = setItems.every((item) => {
+                            const matchingReq = currentRequirements.find(
+                                (req) => req.competencyID === item.competencyID
+                            );
+                            return matchingReq && matchingReq.requiredLevel >= item.requiredLevel;
+                        });
+
+                        if (isFullyApplied && setItems.length > 0) {
+                            appliedIds.add(set.setID);
+                        }
+                    } catch (error) {
+                        console.error(`Error checking set ${set.setID}:`, error);
+                    }
+                })
+            );
+
+            setAppliedSetIds(appliedIds);
+        } catch (error) {
+            console.error('Error checking applied sets:', error);
+        } finally {
+            setCheckingAppliedSets(false);
         }
     };
 
@@ -454,8 +514,8 @@ const CompetencyAssign = () => {
             // Refresh the requirements and position list
             await fetchRequirements(selectedPosition.positionID);
             await fetchPositions();
-            setShowCompetencySetModal(false);
             alert(`Competency set "${competencySet.setName}" has been successfully applied to "${selectedPosition.positionTitle}".`);
+            // Keep the modal open so user can see the updated status
         } catch (error) {
             console.error('Error applying competency set:', error);
             alert('Error applying competency set. Please try again.');
@@ -789,8 +849,14 @@ const CompetencyAssign = () => {
 
             {/* Modal */}
             {showModal && selectedPosition && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                    onClick={handleCloseModal}
+                >
+                    <div 
+                        className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-gray-900">
                                 {editingRequirement ? 'Edit Competency Requirement' : 'Add Competency Requirement'}
@@ -934,8 +1000,14 @@ const CompetencyAssign = () => {
 
             {/* Competency Set Modal */}
             {showCompetencySetModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                    onClick={() => setShowCompetencySetModal(false)}
+                >
+                    <div 
+                        className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-semibold">Apply Competency Set</h2>
                             <button
@@ -951,38 +1023,64 @@ const CompetencyAssign = () => {
                                 Select a competency set to apply to "{selectedPosition?.positionTitle}". 
                                 This will keep existing competencies and update any duplicates with values from the set.
                             </p>
+                            {checkingAppliedSets && (
+                                <div className="mt-2 flex items-center text-sm text-blue-600">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                                    Checking which sets are already applied...
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-3">
-                            {competencySets.map((set) => (
-                                <div key={set.setID} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div className="flex-1">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            {set.isPublic ? (
-                                                <Globe className="w-4 h-4 text-blue-600" />
-                                            ) : (
-                                                <Lock className="w-4 h-4 text-gray-600" />
+                            {competencySets.map((set) => {
+                                const isApplied = appliedSetIds.has(set.setID);
+                                return (
+                                    <div 
+                                        key={set.setID} 
+                                        className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                                            isApplied 
+                                                ? 'bg-green-50 border-green-500' 
+                                                : 'bg-gray-50 border-transparent'
+                                        }`}
+                                    >
+                                        <div className="flex-1">
+                                            <div className="flex items-center space-x-2 mb-2">
+                                                {set.isPublic ? (
+                                                    <Globe className="w-4 h-4 text-blue-600" />
+                                                ) : (
+                                                    <Lock className="w-4 h-4 text-gray-600" />
+                                                )}
+                                                <h4 className="font-medium text-gray-900">{set.setName}</h4>
+                                                {isApplied && (
+                                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white">
+                                                        <Check className="w-3 h-3 mr-1" />
+                                                        Already Applied
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {set.description && (
+                                                <p className="text-sm text-left text-gray-600 mb-2">{set.description}</p>
                                             )}
-                                            <h4 className="font-medium text-gray-900">{set.setName}</h4>
+                                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                                <span>{set.competencyCount} competencies</span>
+                                                <span>by {set.createdByEmployeeName || 'Unknown'}</span>
+                                            </div>
                                         </div>
-                                        {set.description && (
-                                            <p className="text-sm text-gray-600 mb-2">{set.description}</p>
+                                        {canCreate && (
+                                            <button
+                                                onClick={() => handleApplyCompetencySet(set)}
+                                                className={`px-4 py-2 rounded-lg transition-colors ${
+                                                    isApplied
+                                                        ? 'bg-gray-400 text-white hover:bg-gray-500'
+                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                }`}
+                                            >
+                                                {isApplied ? 'Reapply Set' : 'Apply Set'}
+                                            </button>
                                         )}
-                                        <div className="flex items-center space-x-4 text-sm text-gray-500">
-                                            <span>{set.competencyCount} competencies</span>
-                                            <span>by {set.createdByEmployeeName || 'Unknown'}</span>
-                                        </div>
                                     </div>
-                                    {canCreate && (
-                                        <button
-                                            onClick={() => handleApplyCompetencySet(set)}
-                                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                                        >
-                                            Apply Set
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         
                         {competencySets.length === 0 && (

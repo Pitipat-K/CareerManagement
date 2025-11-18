@@ -56,7 +56,7 @@ const EmployeeDevelopment = () => {
     { path: 'assessment', label: 'Competency Assessment', icon: ClipboardList },
     { path: 'dashboard', label: 'Competency Dashboard', icon: PieChart },
     { path: 'development-plan', label: 'Development Plan', icon: ClipboardList },
-    { path: 'career-navigator', label: 'Career Navigator', icon: TrendingUp },
+    //{ path: 'career-navigator', label: 'Career Navigator', icon: TrendingUp },
     { path: 'career-path', label: 'Career Path', icon: Map },
     { path: 'organization-competency', label: 'Organization Competency', icon: Building },
   ];

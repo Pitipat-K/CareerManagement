@@ -63,7 +63,7 @@ type SortField = 'positionTitle' | 'departmentName' | 'jobFunctionName' | 'jobGr
 type SortDirection = 'asc' | 'desc';
 
 const Positions = () => {
-  const { canCreate, hasAnyPermission, loading: permissionsLoading } = useModulePermissions('POSITIONS');
+  const { canCreate, canRead, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('POSITIONS');
   const [positions, setPositions] = useState<Position[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [leadershipLevels, setLeadershipLevels] = useState<LeadershipLevel[]>([]);
@@ -203,6 +203,11 @@ const Positions = () => {
   };
 
   const handleDelete = async (id: number) => {
+    if (!canDelete) {
+      alert('You do not have permission to delete positions.');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this position?')) {
       try {
         const currentEmployeeId = getCurrentEmployeeId();
@@ -262,6 +267,17 @@ const Positions = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check permissions before allowing submit
+    if (editingPosition && !canUpdate) {
+      alert('You do not have permission to update positions.');
+      return;
+    }
+    
+    if (!editingPosition && !canCreate) {
+      alert('You do not have permission to create positions.');
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -603,7 +619,7 @@ const Positions = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="text-lg text-red-600 mb-2">Access Denied</div>
-          <div className="text-gray-600">You do not have permission to access Position Management.</div>
+          <div className="text-gray-600">You do not have permission to access Position Records Management.</div>
         </div>
       </div>
     );
@@ -645,18 +661,22 @@ const Positions = () => {
                   <h3 className="font-semibold text-gray-900">{position.positionTitle}</h3>
                 </div>
                 <div className="flex space-x-2 ml-4">
-                  <button 
-                    onClick={() => handleEditPosition(position)}
-                    className="text-blue-600 hover:text-blue-900 p-1"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(position.positionID)}
-                    className="text-red-600 hover:text-red-900 p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {canUpdate && (
+                    <button 
+                      onClick={() => handleEditPosition(position)}
+                      className="text-blue-600 hover:text-blue-900 p-1"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDelete(position.positionID)}
+                      className="text-red-600 hover:text-red-900 p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
               
@@ -796,18 +816,22 @@ const Positions = () => {
                   </td>
                   <td className="px-2 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-1">
-                      <button 
-                        onClick={() => handleEditPosition(position)}
-                        className="text-blue-600 hover:text-blue-900 p-1"
-                      >
-                        <Edit className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(position.positionID)}
-                        className="text-red-600 hover:text-red-900 p-1"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      {canUpdate && (
+                        <button 
+                          onClick={() => handleEditPosition(position)}
+                          className="text-blue-600 hover:text-blue-900 p-1"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(position.positionID)}
+                          className="text-red-600 hover:text-red-900 p-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

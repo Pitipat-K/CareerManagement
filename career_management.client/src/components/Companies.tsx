@@ -484,7 +484,7 @@ const Companies = () => {
             <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                     <div className="text-lg text-red-600 mb-2">Access Denied</div>
-                    <div className="text-gray-600">You do not have permission to access Company Management.</div>
+                    <div className="text-gray-600">You do not have permission to access Company Records Management.</div>
                 </div>
             </div>
         );

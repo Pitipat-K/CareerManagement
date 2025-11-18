@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Career_Management.Server.Data;
 using Career_Management.Server.Models;
 using Career_Management.Server.Models.DTOs;
+using Career_Management.Server.Services;
 
 namespace Career_Management.Server.Controllers
 {
@@ -11,16 +12,42 @@ namespace Career_Management.Server.Controllers
     public class DepartmentsController : ControllerBase
     {
         private readonly CareerManagementContext _context;
+        private readonly IPermissionService _permissionService;
 
-        public DepartmentsController(CareerManagementContext context)
+        public DepartmentsController(CareerManagementContext context, IPermissionService permissionService)
         {
             _context = context;
+            _permissionService = permissionService;
+        }
+
+        // Helper method to get current user ID
+        private async Task<int?> GetCurrentUserIdAsync()
+        {
+            // TODO: Implement based on your authentication setup
+            // This is a placeholder - you might get this from JWT claims, session, etc.
+            // For now, return a default user ID for testing
+            return 1;
+        }
+
+        // Helper method to check permission
+        private async Task<bool> CheckPermissionAsync(string permissionCode)
+        {
+            var currentUserId = await GetCurrentUserIdAsync();
+            if (!currentUserId.HasValue) return false;
+            
+            return await _permissionService.HasPermissionAsync(currentUserId.Value, "DEPARTMENTS", permissionCode);
         }
 
         // GET: api/Departments
         [HttpGet]
         public async Task<ActionResult<IEnumerable<DepartmentDto>>> GetDepartments()
         {
+            // Check permission
+            if (!await CheckPermissionAsync("R"))
+            {
+                return Forbid("Insufficient permissions to view departments");
+            }
+
             var departments = await _context.Departments
                 .Where(d => d.IsActive)
                 .Include(d => d.Company)
@@ -91,6 +118,12 @@ namespace Career_Management.Server.Controllers
         [HttpPost]
         public async Task<ActionResult<Department>> CreateDepartment(Department department)
         {
+            // Check permission
+            if (!await CheckPermissionAsync("C"))
+            {
+                return Forbid("Insufficient permissions to create departments");
+            }
+
             department.CreatedDate = DateTime.Now;
             department.ModifiedDate = DateTime.Now;
             department.IsActive = true;
@@ -105,6 +138,12 @@ namespace Career_Management.Server.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateDepartment(int id, Department department)
         {
+            // Check permission
+            if (!await CheckPermissionAsync("U"))
+            {
+                return Forbid("Insufficient permissions to update departments");
+            }
+
             if (id != department.DepartmentID)
             {
                 return BadRequest();
@@ -147,6 +186,12 @@ namespace Career_Management.Server.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteDepartment(int id, [FromQuery] int? modifiedBy)
         {
+            // Check permission
+            if (!await CheckPermissionAsync("D"))
+            {
+                return Forbid("Insufficient permissions to delete departments");
+            }
+
             var department = await _context.Departments.FindAsync(id);
             if (department == null)
             {

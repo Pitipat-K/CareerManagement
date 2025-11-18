@@ -56,3 +56,4 @@ Career_Management.Server/Config/*.json
 !Career_Management.Server/Config/assessment-notification-config.json
 !Career_Management.Server/Config/send-email-token.json 
 Career_Management.Server/Config/EmailToken_API.txt
+*.md

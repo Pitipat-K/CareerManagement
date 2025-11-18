@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Trash2, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
+import { useModulePermissions } from '../hooks/usePermissions';
 
 interface JobFunction {
   jobFunctionID: number;
@@ -31,6 +32,7 @@ type SortField = 'jobFunctionName' | 'departmentName';
 type SortDirection = 'asc' | 'desc';
 
 const JobFunctions = () => {
+  const { canCreate, canRead, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('JOBFUNCTIONS');
   const [jobFunctions, setJobFunctions] = useState<JobFunction[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,6 +123,11 @@ const JobFunctions = () => {
   };
 
   const handleDelete = async (id: number) => {
+    if (!canDelete) {
+      alert('You do not have permission to delete job functions.');
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to delete this job function?')) {
       return;
     }
@@ -159,6 +166,17 @@ const JobFunctions = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check permissions before allowing submit
+    if (editingJobFunction && !canUpdate) {
+      alert('You do not have permission to update job functions.');
+      return;
+    }
+    
+    if (!editingJobFunction && !canCreate) {
+      alert('You do not have permission to create job functions.');
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -461,6 +479,27 @@ const JobFunctions = () => {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
 
+  // Show loading state for permissions
+  if (permissionsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600">Loading permissions...</div>
+      </div>
+    );
+  }
+
+  // Check if user has any permission to access this module
+  if (!hasAnyPermission) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-lg text-red-600 mb-2">Access Denied</div>
+          <div className="text-gray-600">You do not have permission to access Job Function Management.</div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -473,13 +512,15 @@ const JobFunctions = () => {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
       <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Job Functions</h2>
-        <button
-          onClick={handleAddNew}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <Plus size={20} />
-          Add Job Function
-        </button>
+        {canCreate && (
+          <button
+            onClick={handleAddNew}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Plus size={20} />
+            Add Job Function
+          </button>
+        )}
       </div>
 
       {/* Search and Filter */}
@@ -588,18 +629,22 @@ const JobFunctions = () => {
                   </td>
                   <td className="px-2 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-1">
-                    <button
-                      onClick={() => handleEditJobFunction(jobFunction)}
-                      className="text-blue-600 hover:text-blue-900 p-1"
-                    >
-                      <Edit className="w-3 h-3" />
-                      </button>
-                    <button
-                      onClick={() => handleDelete(jobFunction.jobFunctionID)}
-                      className="text-red-600 hover:text-red-900 p-1"
-                    >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      {canUpdate && (
+                        <button
+                          onClick={() => handleEditJobFunction(jobFunction)}
+                          className="text-blue-600 hover:text-blue-900 p-1"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(jobFunction.jobFunctionID)}
+                          className="text-red-600 hover:text-red-900 p-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

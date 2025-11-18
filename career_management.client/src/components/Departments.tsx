@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Trash2, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
+import { useModulePermissions } from '../hooks/usePermissions';
 
 interface Department {
   departmentID: number;
@@ -39,6 +40,7 @@ type SortField = 'departmentName' | 'companyName';
 type SortDirection = 'asc' | 'desc';
 
 const Departments = () => {
+  const { canCreate, canRead, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('DEPARTMENTS');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -148,6 +150,11 @@ const Departments = () => {
   };
 
   const handleDelete = async (id: number) => {
+    if (!canDelete) {
+      alert('You do not have permission to delete departments.');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this department?')) {
       try {
         const currentEmployeeId = getCurrentEmployeeId();
@@ -191,6 +198,17 @@ const Departments = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check permissions before allowing submit
+    if (editingDepartment && !canUpdate) {
+      alert('You do not have permission to update departments.');
+      return;
+    }
+    
+    if (!editingDepartment && !canCreate) {
+      alert('You do not have permission to create departments.');
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -484,6 +502,27 @@ const Departments = () => {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
 
+  // Show loading state for permissions
+  if (permissionsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600">Loading permissions...</div>
+      </div>
+    );
+  }
+
+  // Check if user has any permission to access this module
+  if (!hasAnyPermission) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-lg text-red-600 mb-2">Access Denied</div>
+          <div className="text-gray-600">You do not have permission to access Department Records Management.</div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -496,13 +535,15 @@ const Departments = () => {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Departments</h2>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Department</span>
-        </button>
+        {canCreate && (
+          <button 
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Department</span>
+          </button>
+        )}
       </div>
 
       <div className="relative">
@@ -527,18 +568,22 @@ const Departments = () => {
                   <p className="text-sm text-gray-500">{department.description || 'No description'}</p>
                 </div>
                 <div className="flex space-x-2 ml-4">
-                  <button 
-                    onClick={() => handleEditDepartment(department)}
-                    className="text-blue-600 hover:text-blue-900 p-1"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(department.departmentID)}
-                    className="text-red-600 hover:text-red-900 p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {canUpdate && (
+                    <button 
+                      onClick={() => handleEditDepartment(department)}
+                      className="text-blue-600 hover:text-blue-900 p-1"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDelete(department.departmentID)}
+                      className="text-red-600 hover:text-red-900 p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
               
@@ -623,18 +668,22 @@ const Departments = () => {
                   </td>
                   <td className="px-2 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-1">
-                      <button 
-                        onClick={() => handleEditDepartment(department)}
-                        className="text-blue-600 hover:text-blue-900 p-1"
-                      >
-                        <Edit className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(department.departmentID)}
-                        className="text-red-600 hover:text-red-900 p-1"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      {canUpdate && (
+                        <button 
+                          onClick={() => handleEditDepartment(department)}
+                          className="text-blue-600 hover:text-blue-900 p-1"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(department.departmentID)}
+                          className="text-red-600 hover:text-red-900 p-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
