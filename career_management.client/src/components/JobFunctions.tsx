@@ -32,7 +32,7 @@ type SortField = 'jobFunctionName' | 'departmentName';
 type SortDirection = 'asc' | 'desc';
 
 const JobFunctions = () => {
-  const { canCreate, canRead, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('JOBFUNCTIONS');
+  const { canCreate, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('JOBFUNCTIONS');
   const [jobFunctions, setJobFunctions] = useState<JobFunction[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);

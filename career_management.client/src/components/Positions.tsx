@@ -63,7 +63,7 @@ type SortField = 'positionTitle' | 'departmentName' | 'jobFunctionName' | 'jobGr
 type SortDirection = 'asc' | 'desc';
 
 const Positions = () => {
-  const { canCreate, canRead, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('POSITIONS');
+  const { canCreate, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('POSITIONS');
   const [positions, setPositions] = useState<Position[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [leadershipLevels, setLeadershipLevels] = useState<LeadershipLevel[]>([]);

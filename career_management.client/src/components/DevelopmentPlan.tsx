@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Download } from 'lucide-react';
+import { useModulePermissions } from '../hooks/usePermissions';
 
 const LEARNING_WAYS = [
   'On the job training',
@@ -46,6 +47,26 @@ interface CompetencyDomain {
   isActive: boolean;
 }
 
+interface Department {
+  departmentID: number;
+  departmentName: string;
+  companyName?: string;
+}
+
+interface ExportData {
+  year: number;
+  department: string;
+  position: string;
+  employeeName: string;
+  domain: string;
+  category: string;
+  competency: string;
+  learningMethod: string;
+  priority: string;
+  targetDate: string;
+  status: string;
+}
+
 interface PlanFormData {
   developmentPlanID?: number;
   employeeID?: number;
@@ -82,12 +103,23 @@ const DevelopmentPlan: React.FC = () => {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [domains, setDomains] = useState<CompetencyDomain[]>([]);
 
+  // Export modal states
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [exportYear, setExportYear] = useState<string>('');
+  const [selectedDepartments, setSelectedDepartments] = useState<number[]>([]);
+  const [loadingExport, setLoadingExport] = useState(false);
+
   // Get employeeId from localStorage
   const employeeId = getCurrentEmployeeId();
+
+  // Check permissions for Employee Profile module
+  const { canManage } = useModulePermissions('EMP_PROFILE');
 
   useEffect(() => {
     fetchCompetencies();
     fetchDomains();
+    fetchDepartments();
   }, []);
 
   useEffect(() => {
@@ -115,6 +147,15 @@ const DevelopmentPlan: React.FC = () => {
       setDomains(response.data);
     } catch (error) {
       setDomains([]);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await axios.get(getApiUrl('departments'));
+      setDepartments(response.data);
+    } catch (error) {
+      setDepartments([]);
     }
   };
 
@@ -211,6 +252,130 @@ const DevelopmentPlan: React.FC = () => {
     }
   };
 
+  const handleExport = () => {
+    // Open export modal
+    setExportYear(selectedYear.toString());
+    setSelectedDepartments([]);
+    setShowExportModal(true);
+  };
+
+  const handleDepartmentToggle = (deptId: number) => {
+    setSelectedDepartments(prev => {
+      if (prev.includes(deptId)) {
+        return prev.filter(id => id !== deptId);
+      } else {
+        return [...prev, deptId];
+      }
+    });
+  };
+
+  const handleSelectAllDepartments = () => {
+    if (selectedDepartments.length === departments.length) {
+      setSelectedDepartments([]);
+    } else {
+      setSelectedDepartments(departments.map(d => d.departmentID));
+    }
+  };
+
+  const performExport = async () => {
+    if (!exportYear) {
+      alert('Please select a year.');
+      return;
+    }
+
+    setLoadingExport(true);
+    try {
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('year', exportYear);
+      
+      if (selectedDepartments.length > 0) {
+        params.append('departmentIds', selectedDepartments.join(','));
+      }
+
+      // Fetch export data from API
+      const response = await axios.get<ExportData[]>(getApiUrl(`EmployeeDevelopmentPlans/export?${params.toString()}`));
+      const exportData = response.data;
+
+      if (exportData.length === 0) {
+        alert('No data to export with the selected filters.');
+        setLoadingExport(false);
+        return;
+      }
+
+      // Prepare CSV content
+      const headers = [
+        'Year', 
+        'Department', 
+        'Position', 
+        'Employee Name', 
+        'Domain', 
+        'Category', 
+        'Competency', 
+        'Learning Method', 
+        'Priority', 
+        'Target Date', 
+        'Status'
+      ];
+      const csvRows = [headers.join(',')];
+
+      // Escape values that might contain commas or quotes
+      const escapeCSV = (value: string | number) => {
+        const strValue = String(value);
+        if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
+          return `"${strValue.replace(/"/g, '""')}"`;
+        }
+        return strValue;
+      };
+
+      // Add data rows
+      exportData.forEach(data => {
+        const row = [
+          escapeCSV(data.year),
+          escapeCSV(data.department),
+          escapeCSV(data.position),
+          escapeCSV(data.employeeName),
+          escapeCSV(data.domain),
+          escapeCSV(data.category),
+          escapeCSV(data.competency),
+          escapeCSV(data.learningMethod),
+          escapeCSV(data.priority),
+          escapeCSV(data.targetDate),
+          escapeCSV(data.status)
+        ];
+        csvRows.push(row.join(','));
+      });
+
+      // Create CSV content
+      const csvContent = csvRows.join('\n');
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      // Generate filename
+      const deptFilter = selectedDepartments.length > 0 ? '_Filtered' : '_All';
+      const filename = `Development_Plan_${exportYear}${deptFilter}.csv`;
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Close modal
+      setShowExportModal(false);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setLoadingExport(false);
+    }
+  };
+
   const filteredPlans = plans;
 
   // Group plans by domainName (from competency)
@@ -247,6 +412,16 @@ const DevelopmentPlan: React.FC = () => {
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
+          {canManage && (
+            <button
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto ml-4"
+              onClick={handleExport}
+              title="Export Development Plans with filters"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export</span>
+            </button>
+          )}
           <button
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto ml-4"
             onClick={handleAddNew}
@@ -425,6 +600,125 @@ const DevelopmentPlan: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Export Development Plans</h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Year Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Year *</label>
+                <select
+                  value={exportYear}
+                  onChange={e => setExportYear(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select Year</option>
+                  {getYearOptions(5).map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Department Filter */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Departments</label>
+                  <button
+                    type="button"
+                    onClick={handleSelectAllDepartments}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    {selectedDepartments.length === departments.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+                <div className="border border-gray-300 rounded-lg max-h-60 overflow-y-auto">
+                  {departments.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">No departments available</div>
+                  ) : (
+                    <div className="p-2">
+                      {departments.map(dept => (
+                        <label
+                          key={dept.departmentID}
+                          className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedDepartments.includes(dept.departmentID)}
+                            onChange={() => handleDepartmentToggle(dept.departmentID)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="ml-3 text-sm text-gray-900">
+                            {dept.departmentName}
+                            {dept.companyName && (
+                              <span className="ml-2 text-gray-500">({dept.companyName})</span>
+                            )}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  {selectedDepartments.length === 0 
+                    ? 'No departments selected - will export all departments' 
+                    : `${selectedDepartments.length} department(s) selected`}
+                </p>
+              </div>
+
+              {/* Export Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> The export will include all development plans matching the selected filters with the following columns:
+                </p>
+                <ul className="mt-2 text-xs text-blue-700 list-disc list-inside">
+                  <li>Year, Department, Position, Employee Name</li>
+                  <li>Domain, Category, Competency</li>
+                  <li>Learning Method, Priority, Target Date, Status</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 p-6 border-t bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={loadingExport}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={performExport}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                disabled={loadingExport || !exportYear}
+              >
+                {loadingExport ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Exporting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Export to CSV</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

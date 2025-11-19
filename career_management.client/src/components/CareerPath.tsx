@@ -545,7 +545,7 @@ const CareerPath = () => {
                          </div>
                        </div>
                        {allDepartments.map((dept) => (
-                         <label key={dept.departmentID} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                         <label key={dept.departmentID} className="flex items-center text-left p-2 hover:bg-gray-50 rounded cursor-pointer">
                            <input
                              type="checkbox"
                              checked={selectedDepartments.includes(dept.departmentName)}
@@ -928,32 +928,32 @@ const CareerPath = () => {
                                </span>
                              )}
                            </div>
-                                                       <div className="space-y-2">
-                              {/* Required Level */}
-                              <div className="flex items-center space-x-2">
-                                <span className="text-sm text-gray-600">Required Level:</span>
-                                <div className="flex space-x-1">
-                                  {[1, 2, 3, 4, 5].map((level) => (
-                                    <div
-                                      key={level}
-                                      className={`w-4 h-4 rounded-full border-2 ${
-                                        level <= competency.requiredLevel
-                                          ? 'bg-blue-500 border-blue-500'
-                                          : 'bg-gray-200 border-gray-300'
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
-                                <span className="text-sm font-medium text-gray-900">
-                                  Level {competency.requiredLevel}
-                                </span>
-                              </div>
+                            <div className="space-y-2">
+                             {/* Required Level */}
+                             <div className="flex items-center space-x-2">
+                               <span className="text-sm text-gray-600">Required Level:</span>
+                               <div className="flex space-x-1">
+                                 {[1, 2, 3, 4].map((level) => (
+                                   <div
+                                     key={level}
+                                     className={`w-4 h-4 rounded-full border-2 ${
+                                       level <= competency.requiredLevel
+                                         ? 'bg-blue-500 border-blue-500'
+                                         : 'bg-gray-200 border-gray-300'
+                                     }`}
+                                   />
+                                 ))}
+                               </div>
+                               <span className="text-sm font-medium text-gray-900">
+                                 Level {competency.requiredLevel}
+                               </span>
+                             </div>
                               
                               {/* Your Current Level */}
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm text-gray-600">Your Level:</span>
                                 <div className="flex space-x-1">
-                                  {[1, 2, 3, 4, 5].map((level) => {
+                                  {[0, 1, 2, 3, 4].map((level) => {
                                     const userLevel = userCompetencies[competency.competencyID] || 0;
                                     const isCurrentLevel = level === userLevel;
                                     

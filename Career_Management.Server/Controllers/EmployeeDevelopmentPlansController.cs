@@ -101,5 +101,64 @@ namespace Career_Management.Server.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
+
+        // GET: api/EmployeeDevelopmentPlans/export
+        [HttpGet("export")]
+        public async Task<ActionResult<IEnumerable<DevelopmentPlanExportDto>>> GetPlansForExport(
+            [FromQuery] int? year,
+            [FromQuery] string? departmentIds)
+        {
+            var query = _context.EmployeeDevelopmentPlans
+                .Where(p => p.IsActive)
+                .Include(p => p.Employee)
+                    .ThenInclude(e => e.Position)
+                    .ThenInclude(pos => pos.DepartmentNavigation)
+                .Include(p => p.Competency)
+                    .ThenInclude(c => c.Category)
+                    .ThenInclude(cat => cat.Domain)
+                .AsQueryable();
+
+            // Filter by year if provided
+            if (year.HasValue)
+            {
+                query = query.Where(p => p.PlanYear == year.Value);
+            }
+
+            // Filter by departments if provided
+            if (!string.IsNullOrEmpty(departmentIds))
+            {
+                var deptIds = departmentIds.Split(',')
+                    .Select(id => int.TryParse(id.Trim(), out var result) ? result : (int?)null)
+                    .Where(id => id.HasValue)
+                    .Select(id => id!.Value)
+                    .ToList();
+
+                if (deptIds.Any())
+                {
+                    query = query.Where(p => p.Employee.Position != null && 
+                                           p.Employee.Position.DepartmentID.HasValue && 
+                                           deptIds.Contains(p.Employee.Position.DepartmentID.Value));
+                }
+            }
+
+            var plans = await query.ToListAsync();
+
+            var exportDtos = plans.Select(p => new DevelopmentPlanExportDto
+            {
+                Year = p.PlanYear,
+                Department = p.Employee?.Position?.DepartmentNavigation?.DepartmentName ?? "N/A",
+                Position = p.Employee?.Position?.PositionTitle ?? "N/A",
+                EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}".Trim() : "N/A",
+                Domain = p.Competency?.Category?.Domain?.DomainName ?? "N/A",
+                Category = p.Competency?.Category?.CategoryName ?? "N/A",
+                Competency = p.Competency?.CompetencyName ?? "N/A",
+                LearningMethod = p.LearningWay,
+                Priority = p.Priority,
+                TargetDate = p.TargetDate.ToString("yyyy-MM-dd"),
+                Status = p.Status
+            }).ToList();
+
+            return Ok(exportDtos);
+        }
     }
 } 

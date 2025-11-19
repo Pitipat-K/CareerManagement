@@ -40,7 +40,7 @@ type SortField = 'departmentName' | 'companyName';
 type SortDirection = 'asc' | 'desc';
 
 const Departments = () => {
-  const { canCreate, canRead, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('DEPARTMENTS');
+  const { canCreate, canUpdate, canDelete, loading: permissionsLoading, hasAnyPermission } = useModulePermissions('DEPARTMENTS');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);

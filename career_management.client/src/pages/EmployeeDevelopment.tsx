@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link } from 'react-router-dom';
-import { User, ClipboardList, ArrowLeft, Menu, X, LogOut, PieChart, TrendingUp, Map, ChevronLeft, ChevronRight, Building } from 'lucide-react';
+import { User, ClipboardList, ArrowLeft, Menu, X, LogOut, PieChart, Map, ChevronLeft, ChevronRight, Building } from 'lucide-react';
 import { useOktaAuth } from '@okta/okta-react';
 import EmployeeProfile from '../components/EmployeeProfile';
 import CompetencyAssessment from '../components/CompetencyAssessment';
