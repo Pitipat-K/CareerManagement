@@ -9,9 +9,8 @@ using System.Data;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    public class EmployeesController : ControllerBase
+    public class EmployeesController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
         private readonly IPermissionService _permissionService;
@@ -20,15 +19,6 @@ namespace Career_Management.Server.Controllers
         {
             _context = context;
             _permissionService = permissionService;
-        }
-
-        // Helper method to get current user ID (you'll need to implement this based on your auth setup)
-        private async Task<int?> GetCurrentUserIdAsync()
-        {
-            // TODO: Implement based on your authentication setup
-            // This is a placeholder - you might get this from JWT claims, session, etc.
-            // For now, return a default user ID for testing
-            return 1;
         }
 
         // Helper method to check permission
@@ -44,11 +34,9 @@ namespace Career_Management.Server.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<EmployeeDto>>> GetEmployees()
         {
-            // Check permission
-            if (!await CheckPermissionAsync("R"))
-            {
-                return Forbid("Insufficient permissions to view employees");
-            }
+            // Allow all authenticated users to read employees list (needed for SSO login matching)
+            // Permission check is handled by [Authorize] attribute on BaseAuthController
+            // Individual operations (Create, Update, Delete) still require specific permissions
             var employees = await _context.Employees
                 .Where(e => e.IsActive)
                 .Include(e => e.Position)
@@ -148,7 +136,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("C"))
             {
-                return Forbid("Insufficient permissions to create employees");
+                return StatusCode(403, "Insufficient permissions to create employees");
             }
             employee.CreatedDate = DateTime.Now;
             employee.ModifiedDate = DateTime.Now;

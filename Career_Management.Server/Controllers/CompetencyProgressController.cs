@@ -6,8 +6,7 @@ using Career_Management.Server.Models;
 namespace Career_Management.Server.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class CompetencyProgressController : ControllerBase
+    public class CompetencyProgressController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
 

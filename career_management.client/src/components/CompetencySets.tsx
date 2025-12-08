@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Trash2, Search, X, Copy, Eye, Globe, Lock, Users, Minus, ArrowUp, ArrowDown, Filter, Briefcase, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import axios from 'axios';
+import axios from '../utils/axiosConfig';
 import { getApiUrl } from '../config/api';
 import { useModulePermissions } from '../hooks/usePermissions';
 

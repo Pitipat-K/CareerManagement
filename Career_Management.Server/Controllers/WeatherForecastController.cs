@@ -2,9 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
     [Route("[controller]")]
-    public class WeatherForecastController : ControllerBase
+    public class WeatherForecastController : BaseAuthController
     {
         private static readonly string[] Summaries = new[]
         {

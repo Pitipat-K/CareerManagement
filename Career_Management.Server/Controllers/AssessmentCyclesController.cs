@@ -4,12 +4,13 @@ using Career_Management.Server.Data;
 using Career_Management.Server.Models;
 using Career_Management.Server.Models.DTOs;
 using Career_Management.Server.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
-    public class AssessmentCyclesController : ControllerBase
+    public class AssessmentCyclesController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
         private readonly NotificationService _notificationService;

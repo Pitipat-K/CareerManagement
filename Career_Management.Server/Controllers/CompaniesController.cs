@@ -7,9 +7,8 @@ using Career_Management.Server.Services;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    public class CompaniesController : ControllerBase
+    public class CompaniesController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
         private readonly IPermissionService _permissionService;
@@ -18,15 +17,6 @@ namespace Career_Management.Server.Controllers
         {
             _context = context;
             _permissionService = permissionService;
-        }
-
-        // Helper method to get current user ID
-        private async Task<int?> GetCurrentUserIdAsync()
-        {
-            // TODO: Implement based on your authentication setup
-            // This is a placeholder - you might get this from JWT claims, session, etc.
-            // For now, return a default user ID for testing
-            return 1;
         }
 
         // Helper method to check permission
@@ -45,7 +35,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("R"))
             {
-                return Forbid("Insufficient permissions to view companies");
+                return StatusCode(403, "Insufficient permissions to view companies");
             }
 
             var companies = await _context.Companies
@@ -119,7 +109,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("C"))
             {
-                return Forbid("Insufficient permissions to create companies");
+                return StatusCode(403, "Insufficient permissions to create companies");
             }
 
             company.CreatedDate = DateTime.Now;
@@ -139,7 +129,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("U"))
             {
-                return Forbid("Insufficient permissions to update companies");
+                return StatusCode(403, "Insufficient permissions to update companies");
             }
 
             if (id != company.CompanyID)
@@ -186,7 +176,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("D"))
             {
-                return Forbid("Insufficient permissions to delete companies");
+                return StatusCode(403, "Insufficient permissions to delete companies");
             }
 
             var company = await _context.Companies.FindAsync(id);

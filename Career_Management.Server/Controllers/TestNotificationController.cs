@@ -5,9 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    public class TestNotificationController : ControllerBase
+    public class TestNotificationController : BaseAuthController
     {
         private readonly NotificationService _notificationService;
         private readonly CareerManagementContext _context;

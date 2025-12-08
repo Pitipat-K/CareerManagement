@@ -6,9 +6,8 @@ using Career_Management.Server.Models.DTOs;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    public class CompetencyCategoriesController : ControllerBase
+    public class CompetencyCategoriesController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
 

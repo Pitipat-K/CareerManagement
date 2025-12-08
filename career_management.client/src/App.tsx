@@ -12,6 +12,8 @@ import UserManagement from './pages/UserManagement';
 import TestNotification from './components/TestNotification';
 import ProtectedRoute from './components/ProtectedRoute';
 import oktaAuth from './config/okta';
+import axios from './utils/axiosConfig';
+import { getApiUrl } from './config/api';
 import './App.css';
 
 function App() {
@@ -29,10 +31,10 @@ function App() {
         localStorage.setItem('oktaUser', JSON.stringify(user));
         localStorage.setItem('userEmail', user.email);
         
-        // Find employee by email
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/Employees`);
-        if (response.ok) {
-          const employees = await response.json();
+        // Find employee by email using authenticated axios
+        const response = await axios.get(getApiUrl('Employees'));
+        if (response.status === 200) {
+          const employees = response.data;
           const employee = employees.find((emp: any) => {
             const empEmail = emp.email?.toLowerCase()?.trim();
             const searchEmail = user.email?.toLowerCase()?.trim();
@@ -46,8 +48,6 @@ function App() {
           } else {
             window.location.replace('/login?error=employee_not_found');
           }
-        } else {
-          window.location.replace('/login?error=employee_lookup_failed');
         }
       } else {
         window.location.replace('/login?error=no_user_info');

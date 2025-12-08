@@ -8,9 +8,8 @@ using System.Text;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    public class CompetencySetsController : ControllerBase
+    public class CompetencySetsController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
 

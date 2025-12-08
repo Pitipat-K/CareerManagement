@@ -133,6 +133,12 @@ const Login = () => {
       if (response.ok && data.success) {
         // Login successful
         const userData = data.user;
+        const token = data.token;
+        
+        // Store JWT token
+        if (token) {
+          localStorage.setItem('jwtToken', token);
+        }
         
         // Store user info in localStorage
         localStorage.setItem('currentEmployee', JSON.stringify(userData));

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOktaAuth } from '@okta/okta-react';
+import axios from '../utils/axiosConfig';
 import { getApiUrl } from '../config/api';
 import { userManagementApi } from '../services/userManagementApi';
 
@@ -14,9 +15,16 @@ const LoginCallback = () => {
     try {
       console.log('Searching for employee with email:', email);
       
-      const response = await fetch(getApiUrl('Employees'));
-      if (response.ok) {
-        const employees = await response.json();
+      // Wait a bit to ensure Okta tokens are stored
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Use axios instance which includes authentication headers
+      console.log('Fetching employees from API with authentication...');
+      const response = await axios.get(getApiUrl('Employees'));
+      console.log('Employees API response status:', response.status);
+      
+      if (response.status === 200) {
+        const employees = response.data;
         console.log('Total employees found:', employees.length);
         
         // Try to match by email (case-insensitive)
@@ -55,12 +63,14 @@ const LoginCallback = () => {
           console.log('❌ Employee not found with email:', email);
           return false;
         }
-      } else {
-        console.error('Failed to fetch employees:', response.status);
-        return false;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error finding employee:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       return false;
     }
   };

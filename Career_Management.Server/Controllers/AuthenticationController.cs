@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Career_Management.Server.Data;
@@ -8,6 +9,7 @@ using System.Text;
 
 namespace Career_Management.Server.Controllers
 {
+    [AllowAnonymous]
     [ApiController]
     [Route("api/[controller]")]
     public class AuthenticationController : ControllerBase
@@ -15,6 +17,7 @@ namespace Career_Management.Server.Controllers
         private readonly CareerManagementContext _context;
         private readonly ILogger<AuthenticationController> _logger;
         private readonly IEmailService _emailService;
+        private readonly IJwtTokenService _jwtTokenService;
         private const int MaxLoginAttempts = 5;
         private const int LockoutMinutes = 30;
         private const int VerificationCodeExpiryMinutes = 15;
@@ -22,11 +25,13 @@ namespace Career_Management.Server.Controllers
         public AuthenticationController(
             CareerManagementContext context, 
             ILogger<AuthenticationController> logger,
-            IEmailService emailService)
+            IEmailService emailService,
+            IJwtTokenService jwtTokenService)
         {
             _context = context;
             _logger = logger;
             _emailService = emailService;
+            _jwtTokenService = jwtTokenService;
         }
 
         /// <summary>
@@ -125,6 +130,7 @@ namespace Career_Management.Server.Controllers
         /// <summary>
         /// Step 2: Login with email and password
         /// </summary>
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -233,11 +239,20 @@ namespace Career_Management.Server.Controllers
 
                 _logger.LogInformation("Login successful for user: {UserID}", user.UserID);
 
-                // Return employee and user info
+                // Generate JWT token
+                var token = _jwtTokenService.GenerateToken(
+                    user.UserID,
+                    employee.EmployeeID,
+                    employee.Email,
+                    user.IsSystemAdmin
+                );
+
+                // Return employee and user info with JWT token
                 return Ok(new
                 {
                     success = true,
                     message = "Login successful",
+                    token = token,
                     user = new
                     {
                         userID = user.UserID,

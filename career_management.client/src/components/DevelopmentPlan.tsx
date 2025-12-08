@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../utils/axiosConfig';
 import { getApiUrl } from '../config/api';
 import { Plus, Edit, Trash2, X, Download } from 'lucide-react';
 import { useModulePermissions } from '../hooks/usePermissions';

@@ -7,9 +7,8 @@ using Career_Management.Server.Services;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    public class UsersController : ControllerBase
+    public class UsersController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
         private readonly IPermissionService _permissionService;

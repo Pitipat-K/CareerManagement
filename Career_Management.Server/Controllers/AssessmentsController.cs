@@ -11,9 +11,8 @@ using System.Threading.Tasks;
 
 namespace Career_Management.Server.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    public class AssessmentsController : ControllerBase
+    public class AssessmentsController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
         private readonly NotificationService _notificationService;

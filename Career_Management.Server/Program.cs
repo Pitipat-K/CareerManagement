@@ -32,13 +32,16 @@ builder.Services.AddScoped<Career_Management.Server.Services.IPermissionService,
 // Add Email Service
 builder.Services.AddScoped<Career_Management.Server.Services.IEmailService, Career_Management.Server.Services.EmailService>();
 
-// Add Okta Authentication
+// Add JWT Token Service
+builder.Services.AddScoped<Career_Management.Server.Services.IJwtTokenService, Career_Management.Server.Services.JwtTokenService>();
+
+// Add Authentication with support for both Okta and custom JWT tokens
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
+.AddJwtBearer("OktaBearer", options =>
 {
     options.Authority = builder.Configuration["Okta:Issuer"];
     options.Audience = builder.Configuration["Okta:Audience"];
@@ -52,6 +55,33 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Okta:Issuer"],
         ValidAudience = builder.Configuration["Okta:Audience"]
     };
+})
+.AddJwtBearer("CustomBearer", options =>
+{
+    var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+    var secretKey = jwtSettings["SecretKey"];
+    
+    options.RequireHttpsMetadata = false; // Set to true in production
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey ?? throw new InvalidOperationException("JWT SecretKey is not configured")))
+    };
+});
+
+// Configure policy to accept tokens from both schemes
+builder.Services.AddAuthorization(options =>
+{
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes("OktaBearer", "CustomBearer")
+        .RequireAuthenticatedUser()
+        .Build();
 });
 
 // Add CORS

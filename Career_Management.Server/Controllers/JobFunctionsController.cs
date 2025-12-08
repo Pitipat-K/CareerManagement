@@ -8,8 +8,7 @@ using Career_Management.Server.Services;
 namespace Career_Management.Server.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class JobFunctionsController : ControllerBase
+    public class JobFunctionsController : BaseAuthController
     {
         private readonly CareerManagementContext _context;
         private readonly IPermissionService _permissionService;
@@ -18,15 +17,6 @@ namespace Career_Management.Server.Controllers
         {
             _context = context;
             _permissionService = permissionService;
-        }
-
-        // Helper method to get current user ID
-        private async Task<int?> GetCurrentUserIdAsync()
-        {
-            // TODO: Implement based on your authentication setup
-            // This is a placeholder - you might get this from JWT claims, session, etc.
-            // For now, return a default user ID for testing
-            return 1;
         }
 
         // Helper method to check permission
@@ -45,7 +35,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("R"))
             {
-                return Forbid("Insufficient permissions to view job functions");
+                return StatusCode(403, "Insufficient permissions to view job functions");
             }
 
             var jobFunctions = await _context.JobFunctions
@@ -110,7 +100,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("C"))
             {
-                return Forbid("Insufficient permissions to create job functions");
+                return StatusCode(403, "Insufficient permissions to create job functions");
             }
 
             if (!ModelState.IsValid)
@@ -135,7 +125,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("U"))
             {
-                return Forbid("Insufficient permissions to update job functions");
+                return StatusCode(403, "Insufficient permissions to update job functions");
             }
 
             if (id != jobFunction.JobFunctionID)
@@ -181,7 +171,7 @@ namespace Career_Management.Server.Controllers
             // Check permission
             if (!await CheckPermissionAsync("D"))
             {
-                return Forbid("Insufficient permissions to delete job functions");
+                return StatusCode(403, "Insufficient permissions to delete job functions");
             }
 
             var jobFunction = await _context.JobFunctions.FindAsync(id);
